@@ -127,7 +127,8 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 	@expression(EP, eGenerationByZone[z=1:Z, t=1:T], 0)
 
 	# Infrastructure
-	EP = discharge(EP, inputs, setup["EnergyShareRequirement"])
+	EP = discharge(EP, inputs, setup["EnergyShareRequirement"], setup["PieceWiseHeatRate"])
+
 
 	EP = non_served_energy(EP, inputs, setup["CapacityReserveMargin"])
 
@@ -180,7 +181,7 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 	end
 	# Model constraints, variables, expression related to thermal resource technologies
 	if !isempty(inputs["THERM_ALL"])
-		EP = thermal(EP, inputs, setup["UCommit"], setup["Reserves"], setup["CapacityReserveMargin"])
+		EP = thermal(EP, inputs, setup["UCommit"], setup["Reserves"], setup["CapacityReserveMargin"],setup["PieceWiseHeatRate"])
 	end
 
 	if !isempty(inputs["DAC"])

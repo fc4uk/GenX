@@ -73,11 +73,25 @@ function co2_tax(EP::Model, inputs::Dict, setup::Dict)
 	@expression(EP, eCO2Sum[z=1:Z], sum(inputs["omega"][t]*EP[:eEmissionsByZone][z,t] for t in 1:T))
 	@constraint(EP,[z=1:Z], eCO2Sum[z] >= 0 )
 	@expression(EP, eCCO2Tax[z=1:Z], inputs["dfCO2Tax"][!,"CO2Tax"][z] * eCO2Sum[z])
-
-
 	@expression(EP, eTotalCCO2Tax,sum(eCCO2Tax[z] for z in 1:Z))
 
-	EP[:eObj] += eTotalCCO2Tax
+	# also add the cost associated co2 sequestration
+
+
+			
+	@expression(EP, eCO2SequestrationSum[z=1:Z],
+		if setup["PieceWiseHeatRate"] ==1
+			sum(inputs["omega"][t]*EP[:eCO2SequestrationByZone][z,t] for t in 1:T)
+		end
+	)
+	
+	if setup["PieceWiseHeatRate"] ==1
+		@expression(EP, eTotalCCO2Sequestration,sum(eCO2SequestrationSum[z] for z in 1:Z))
+		EP[:eObj] = EP[:eObj] + eTotalCCO2Tax + eTotalCCO2Sequestration
+	else
+		EP[:eObj] = EP[:eObj] + eTotalCCO2Tax 
+	end
+
 
 	return EP
 

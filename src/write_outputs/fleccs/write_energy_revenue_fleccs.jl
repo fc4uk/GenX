@@ -29,36 +29,38 @@ function write_energy_revenue_fleccs(path::AbstractString, inputs::Dict, setup::
 	N_F = inputs["N_F"]
 	N = length(N_F)
 
+    # the index for BOP
 	i = inputs["BOP_id"]
+     # if we are testing mutiple zones or mutiple cases..
+	j = inputs["BOP_id"]*FLECCS_ALL
 	# dfEnergyRevenue = DataFrame(Resource = inputs["RESOURCES"], Zone = dfGen_ccs[!,:Zone], AnnualSum = Array{Union{Missing,Float32}}(undef, G))
 	# the price is already US$/MWh, and dfPower_FLECCS and dfCharge is already in MW, so no scaling is needed
-	dfEnergyRevenue = DataFrame( Resource = dfGen_ccs[!,"Resource"][i], Zone = dfGen_ccs[!,:Zone][i], AnnualSum = Array{Union{Missing,Float32}}(undef, G_F), )
+	dfEnergyRevenue = DataFrame( Resource = dfGen_ccs[!,"Resource"][j], Zone = dfGen_ccs[!,:Zone][j],R_ID = dfGen_ccs[!,:R_ID][j], AnnualSum = Array{Union{Missing,Float32}}(undef, G_F), )
 	# initiation
 	dfEnergyRevenue_FLECCS1 = (DataFrame([[names(dfPower_FLECCS)]; collect.(eachrow(dfPower_FLECCS))], [:column; Symbol.(axes(dfPower_FLECCS, 1))])[4:T+3,i+1] .*
 	DataFrame([[names(dfPrice)]; collect.(eachrow(dfPrice))], [:column; Symbol.(axes(dfPrice, 1))])[2:T+1,dfPower_FLECCS[i,:][:Zone]+1].*
 	inputs["omega"])
+    # if we have mutiple NGCC-CCS with differernt parameters or setting
+	if length(j) >1
+		for i in 2:length(j)
+			dfEnergyRevenue_FLECCS1 = hcat(dfEnergyRevenue_FLECCS1,(DataFrame([[names(dfPower_FLECCS)]; collect.(eachrow(dfPower_FLECCS))], [:column; Symbol.(axes(dfPower_FLECCS, 1))])[4:T+3,j[i]+1] .*
+			DataFrame([[names(dfPrice)]; collect.(eachrow(dfPrice))], [:column; Symbol.(axes(dfPrice, 1))])[2:T+1,dfPower_FLECCS[j[i],:][:Zone]+1].*
+			inputs["omega"]))
+		end
+	end
+			
+
 	dfEnergyRevenue_FLECCS = hcat(dfEnergyRevenue, DataFrame(dfEnergyRevenue_FLECCS1', :auto))
-	dfEnergyRevenue_FLECCS[!,:AnnualSum][1] = sum(dfEnergyRevenue_FLECCS1)
 
 
-	if G_F > 1
-		# right now we only evaluate fleccs technologies in a single zone so we will not use the following code.. will come back later
-		i = inputs["BOP_id"]
-		# dfEnergyRevenue = DataFrame(Resource = inputs["RESOURCES"], Zone = dfGen_ccs[!,:Zone], AnnualSum = Array{Union{Missing,Float32}}(undef, G))
-		# the price is already US$/MWh, and dfPower_FLECCS and dfCharge is already in MW, so no scaling is needed
-		dfEnergyRevenue = DataFrame( Resource = dfGen_ccs[!,"Resource"][i], Zone = dfGen_ccs[!,:Zone][i], AnnualSum = Array{Union{Missing,Float32}}(undef, G_F), )
-		# initiation
-		dfEnergyRevenue_FLECCS1 = (DataFrame([[names(dfPower_FLECCS)]; collect.(eachrow(dfPower_FLECCS))], [:column; Symbol.(axes(dfPower_FLECCS, 1))])[4:T+3,i+1] .*
-		DataFrame([[names(dfPrice)]; collect.(eachrow(dfPrice))], [:column; Symbol.(axes(dfPrice, 1))])[2:T+1,dfPower_FLECCS[i,:][:Zone]+1].*
-		inputs["omega"])
-		dfEnergyRevenue_FLECCS = hcat(dfEnergyRevenue, DataFrame(dfEnergyRevenue_FLECCS1', :auto))
-		dfEnergyRevenue_FLECCS[!,:AnnualSum][1] = sum(dfEnergyRevenue_FLECCS1)
-	
-
+	for i in 1:length(j)
+		dfEnergyRevenue_FLECCS[!,:AnnualSum][i] = sum(dfEnergyRevenue_FLECCS1[:,i])
 	end
 
 
-	dfEnergyRevenue_FLECCS_annualonly = dfEnergyRevenue_FLECCS[!,1:3]
+
+
+	dfEnergyRevenue_FLECCS_annualonly = dfEnergyRevenue_FLECCS[!,1:4]
 	CSV.write(joinpath(path, "EnergyRevenue_FLECCS.csv"), dfEnergyRevenue_FLECCS_annualonly)
 	return dfEnergyRevenue_FLECCS
 end

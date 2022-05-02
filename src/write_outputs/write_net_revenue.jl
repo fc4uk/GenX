@@ -49,12 +49,28 @@ function write_net_revenue(path::AbstractString, inputs::Dict, setup::Dict, EP::
 
 	# Add fuel cost to the dataframe
 	dfNetRevenue.Fuel_cost = zeros(size(dfNetRevenue, 1))
+
+
 	for i in 1:G
 		dfNetRevenue.Fuel_cost[i] = sum(inputs["C_Fuel_per_MWh"][i,:] .* inputs["omega"] .* value.(EP[:vP])[i,:])
 	end
+
+	# include CO2 sequestration cost to the fuel cost 
+
+	if setup["PieceWiseHeatRate"] == 1 && setup["UCommit"] >= 1
+		for i in COMMIT
+			dfNetRevenue.Fuel_cost[i] = sum(value.(EP[:eCFuel_piecewise])[i,:]) + value.(EP[:eCO2SequestrationCost][i])
+		end
+	end
+		
+
+
+
 	if setup["ParameterScale"] == 1
 		dfNetRevenue.Fuel_cost = dfNetRevenue.Fuel_cost * (ModelScalingFactor^2) # converting Million US$ to US$
 	end
+
+
 
 	# Add storage cost to the dataframe
 	dfNetRevenue.Var_OM_cost_in = zeros(size(dfNetRevenue, 1))
@@ -131,16 +147,16 @@ function write_net_revenue(path::AbstractString, inputs::Dict, setup::Dict, EP::
 		end
  	end
 
-
+	dfNetRevenue.CO2Price = zeros(size(dfNetRevenue, 1))
 	if setup["CO2Tax"] >=1 && has_duals(EP) == 1
 		for z in 1:Z
 			for y in 1:G
-		        dfNetRevenue.EmissionsCost[y] =   inputs["dfCO2Tax"][!,"CO2Tax"][z]*sum(value.(EP[:eEmissionsByPlant][y,t])* inputs["omega"][t] for t in 1:T) 
+		        dfNetRevenue.CO2Price[y] =   inputs["dfCO2Tax"][!,"CO2Tax"][z]*sum(value.(EP[:eEmissionsByPlant][y,t])* inputs["omega"][t] for t in 1:T) 
 			end
 		end
 
 		if setup["ParameterScale"] == 1
-			dfNetRevenue[!,:EmissionsCost] = dfNetRevenue[!,:EmissionsCost] * (ModelScalingFactor^2) # converting Million US$ to US$
+			dfNetRevenue[!,:CO2Price] = dfNetRevenue[!,CO2Price] * (ModelScalingFactor^2) # converting Million US$ to US$
 		end
 	end
 
@@ -154,7 +170,7 @@ function write_net_revenue(path::AbstractString, inputs::Dict, setup::Dict, EP::
 	end
 
 	dfNetRevenue.Revenue =	dfNetRevenue.EnergyRevenue + dfNetRevenue.SubsidyRevenue + dfNetRevenue.ReserveMarginRevenue + dfNetRevenue.ESRRevenue + dfNetRevenue.RegSubsidyRevenue
-	dfNetRevenue.Cost = dfNetRevenue.Inv_cost_MW + dfNetRevenue.Inv_cost_MWh + dfNetRevenue.Fixed_OM_cost_MW + dfNetRevenue.Fixed_OM_cost_MWh + dfNetRevenue.Var_OM_cost_out + dfNetRevenue.Var_OM_cost_in + dfNetRevenue.Fuel_cost + dfNetRevenue.Charge_cost + dfNetRevenue.EmissionsCost + dfNetRevenue.StartCost
+	dfNetRevenue.Cost = dfNetRevenue.Inv_cost_MW + dfNetRevenue.Inv_cost_MWh + dfNetRevenue.Fixed_OM_cost_MW + dfNetRevenue.Fixed_OM_cost_MWh + dfNetRevenue.Var_OM_cost_out + dfNetRevenue.Var_OM_cost_in + dfNetRevenue.Fuel_cost + dfNetRevenue.Charge_cost + dfNetRevenue.EmissionsCost + dfNetRevenue.StartCost + dfNetRevenue.CO2Price
 	#dfNetRevenue.Cost = dfNetRevenue.Inv_cost_MW + dfNetRevenue.Inv_cost_MWh + dfNetRevenue.Fixed_OM_cost_MW + dfNetRevenue.Fixed_OM_cost_MWh + dfNetRevenue.Var_OM_cost_out + dfNetRevenue.Var_OM_cost_in + dfNetRevenue.Fuel_cost + dfNetRevenue.Charge_cost + dfNetRevenue.EmissionsCost + dfNetRevenue.StartCost
 	dfNetRevenue.Profit = 	dfNetRevenue.Revenue - dfNetRevenue.Cost
 

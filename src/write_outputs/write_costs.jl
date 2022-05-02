@@ -28,7 +28,10 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 
 	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cNSE", "cStart", "cUnmetRsv", "cNetworkExp"])
 	if setup["ParameterScale"] == 1
-		cVar = (value(EP[:eTotalCVarOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0)) * (ModelScalingFactor^2)
+		cVar = (value(EP[:eTotalCVarOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0)) * (ModelScalingFactor^2)+ (value.(EP[:eTotalCCO2Tax]) )* (ModelScalingFactor^2)
+		if setup["PieceWiseHeatRate"] == 1 && setup["UCommit"] >= 1
+			cVar = cVar + value(EP[:eCVar_fuel_piecewise]) * (ModelScalingFactor^2) + value.(EP[:eTotalCCO2Sequestration])* (ModelScalingFactor^2)
+		end	
 		cFix = (value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0)) * (ModelScalingFactor^2)
 		if setup["FLECCS"] >= 1
 	        cVar = cVar + value.(EP[:eTotalCVar_FLECCS])* (ModelScalingFactor^2) + value.(EP[:eTotalCCO2Tax])* (ModelScalingFactor^2)
@@ -36,12 +39,15 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 	    end
 		dfCost[!,Symbol("Total")] = [objective_value(EP) * (ModelScalingFactor^2), cFix, cVar,value(EP[:eTotalCNSE]) * (ModelScalingFactor^2), 0, 0, 0]
 	else
-		cVar = (value(EP[:eTotalCVarOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0))
+		cVar = (value(EP[:eTotalCVarOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0)) + value.(EP[:eTotalCCO2Tax]) 
+		if setup["PieceWiseHeatRate"] == 1 && setup["UCommit"] >= 1
+			cVar = cVar + value(EP[:eCVar_fuel_piecewise]) +  value.(EP[:eTotalCCO2Sequestration])
+		end
 		#cVar = value(EP[:eTotalCVarOut])+(!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0)
 		cFix = value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0)
 		if setup["FLECCS"] >= 1
 			cVar = cVar + value.(EP[:eTotalCVar_FLECCS]) +  value.(EP[:eTotalCCO2Tax])
-			cFix = cFix  + value.(EP[:eTotalCFixFLECCS])
+			cFix = cFix  + value.(EP[:eTotalCFixFLECCS]) + value.(EP[:eTotalCFLECCS_tx])
 		end
 		dfCost[!,Symbol("Total")] = [objective_value(EP), cFix, cVar, value(EP[:eTotalCNSE]), 0, 0, 0]
 	end
@@ -82,6 +88,11 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 				(y in inputs["STOR_ALL"] ? sum(value.(EP[:eCVar_in])[y,:]) : 0) +
 				(y in inputs["FLEX"] ? sum(value.(EP[:eCVarFlex_in])[y,:]) : 0) +
 				sum(value.(EP[:eCVar_out])[y,:])
+			
+			if setup["PieceWiseHeatRate"] == 1 && setup["UCommit"] >= 1
+				tempCVar = tempCVar + (y in inputs["COMMIT"] ? sum(value.(EP[:eCFuel_piecewise])[y,:]) : 0)
+			end
+
 			if setup["UCommit"]>=1
 				tempCTotal = tempCTotal +
 					value.(EP[:eCFix])[y] +
@@ -91,6 +102,11 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 					(y in inputs["COMMIT"] ? sum(value.(EP[:eCStart])[y,:]) : 0)
 				tempCStart = tempCStart +
 					(y in inputs["COMMIT"] ? sum(value.(EP[:eCStart])[y,:]) : 0)
+
+				if setup["PieceWiseHeatRate"] == 1
+					tempCTotal = tempCTotal + (y in inputs["COMMIT"] ? sum(value.(EP[:eCFuel_piecewise])[y,:]) : 0)
+				end
+				
 			else
 				tempCTotal = tempCTotal +
 					value.(EP[:eCFix])[y] +

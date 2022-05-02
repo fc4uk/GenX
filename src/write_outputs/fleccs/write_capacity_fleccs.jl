@@ -74,11 +74,9 @@ function write_capacity_fleccs(path::AbstractString, inputs::Dict, setup::Dict, 
 
 
 
-
-
-
 	dfCapFLECCS = DataFrame(
-		Resource = dfGen_ccs[!,"Resource"], Zone = dfGen_ccs[!,:Zone],
+		Resource = dfGen_ccs[!,"Resource"],
+		Zone = dfGen_ccs[!,:Zone], R_ID = dfGen_ccs[!,:R_ID],
 		StartCap = dfGen_ccs[!,:Existing_Cap_Unit],
 		RetCap = retcapFLECCS[:],
 		NewCap = capFLECCS[:],
@@ -92,12 +90,48 @@ function write_capacity_fleccs(path::AbstractString, inputs::Dict, setup::Dict, 
 	end
 
 	total = DataFrame(
-			Resource = "Total", Zone = "n/a",
+			Resource = "Total", Zone = "n/a", R_ID = "n/a", 
 			StartCap = sum(dfCapFLECCS[!,:StartCap]), RetCap = sum(dfCapFLECCS[!,:RetCap]),
 			NewCap = sum(dfCapFLECCS[!,:NewCap]), EndCap = sum(dfCapFLECCS[!,:EndCap]),
 		)
 
 	dfCap_FLECCS = vcat(dfCapFLECCS, total)
 	CSV.write(joinpath(path,"capacity_FLECCS.csv"), dfCap_FLECCS)
+
+####################################### plot net capacity
+
+
+	capFLECCS_net = zeros(size(FLECCS_ALL))
+    #reshape(zeros(size(dfGen_ccs[!,"Resource"])),length(FLECCS_ALL),length(N_F))
+	
+	for y in FLECCS_ALL
+		capFLECCS_net[y] = value(EP[:vCAP_FLECCS_tx][y])
+	end
+
+    BOP_id = inputs["BOP_id"]
+	j = BOP_id*FLECCS_ALL
+
+	dfCapFLECCS_net = DataFrame(
+		Resource = dfGen_ccs[!,"Resource"][j],
+		Zone = dfGen_ccs[!,:Zone][j], R_ID = dfGen_ccs[!,:R_ID][j],
+		EndCap = capFLECCS_net,
+	)
+	if setup["ParameterScale"] ==1
+		dfCapFLECCS_net.EndCap = dfCapFLECCS.EndCap * ModelScalingFactor
+	end
+
+	total_net = DataFrame(
+			Resource = "Total", Zone = "n/a", R_ID = "n/a", 
+			EndCap = sum(dfCapFLECCS_net[!,:EndCap]),
+		)
+
+	dfCapFLECCS_net = vcat(dfCapFLECCS_net, total_net)
+
+	CSV.write(joinpath(path,"Netcapacity_FLECCS.csv"), dfCapFLECCS_net)
+
+
+
+
+
 	return dfCap_FLECCS
 end

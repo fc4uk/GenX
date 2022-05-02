@@ -32,7 +32,7 @@ function write_power_fleccs(path::AbstractString, inputs::Dict, setup::Dict, EP:
     # the number of subcompoents 
 	N = length(N_F)
 
-	dfPower_FLECCS = DataFrame(Resource = dfGen_ccs[!,:Resource], Zone = dfGen_ccs[!,:Zone], AnnualSum = Array{Union{Missing,Float32}}(undef, length(dfGen_ccs[!,:Resource])))
+	dfPower_FLECCS = DataFrame(Resource = dfGen_ccs[!,:Resource], R_ID =dfGen_ccs[!,"R_ID"], Zone = dfGen_ccs[!,:Zone], AnnualSum = Array{Union{Missing,Float32}}(undef, length(dfGen_ccs[!,:Resource])))
 	
 	FLECCS_output = zeros(G_F*N,T)
 
