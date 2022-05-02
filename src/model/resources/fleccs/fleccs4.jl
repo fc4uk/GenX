@@ -260,16 +260,16 @@ function fleccs4(EP::Model, inputs::Dict,  FLECCS::Int, UCommit::Int, Reserves::
 	# variable O&M for heat pump
 	@expression(EP,eCVar_heatpump[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== HeatPump_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(ePower_use_ts[y,t]))
 	# variable O&M for hot storage
-	@expression(EP,eCVar_rich[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Hot_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vSTORE_hot[y,t]))
+	@expression(EP,eCVar_hot[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Hot_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vSTEAM_in[y,t]))
 	# variable O&M for cold storage
-	@expression(EP,eCVar_lean[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Cold_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vSTORE_cold[y,t]))
+	@expression(EP,eCVar_cold[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Cold_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vCOLD_in[y,t]))
 	# variable O&M for PCC
 	@expression(EP,eCVar_PCC[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== PCC_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vCAPTURE[y,t]))
 
 
 	#adding up variable cost
 
-	@expression(EP,eVar_FLECCS[t = 1:T], sum(eCVar_fuel[y,t] + eCVar_CO2_sequestration[y,t] + eCVar_gt[y,t] + eCVar_st[y,t] + eCVar_comp[y,t] + eCVar_PCC[y,t] +eCVar_heatpump[y,t]  for y in FLECCS_ALL))
+	@expression(EP,eVar_FLECCS[t = 1:T], sum(eCVar_fuel[y,t] + eCVar_CO2_sequestration[y,t] + eCVar_gt[y,t] + eCVar_st[y,t] + eCVar_comp[y,t] + eCVar_PCC[y,t] +eCVar_heatpump[y,t] + eCVar_hot[y,t] + eCVar_cold[y,t] for y in FLECCS_ALL))
 
 	@expression(EP,eTotalCVar_FLECCS, sum(eVar_FLECCS[t] for t in 1:T))
 
