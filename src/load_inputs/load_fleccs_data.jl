@@ -23,47 +23,33 @@ function load_fleccs_data(setup::Dict, path::AbstractString,  inputs_ccs::Dict, 
 
 	if setup["FLECCS"] == 1
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data1.csv"), header=true), copycols=true)
-		#FLECCS_parameters = DataFrame(CSV.File(joinpath(path,"FLECCS_data1_process_parameters.csv"), header=true), copycols=true)
-
-
 		println("FLECCS_data1.csv Successfully Read!, NGCC-CCS without flexible subcompoents")
 	elseif setup["FLECCS"] == 2
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data2.csv"), header=true), copycols=true)
-		#FLECCS_parameters =  DataFrame(CSV.File(joinpath(path,"FLECCS_data2_process_parameters.csv"), header=true), copycols=true)
 		println("FLECCS_data2.csv Successfully Read!, NGCC-CCS with solvent storage")
 	elseif setup["FLECCS"] == 3
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data3.csv"), header=true), copycols=true)
-		#FLECCS_parameters = DataFrame(CSV.File(joinpath(path,"FLECCS_data3_process_parameters.csv"), header=true), copycols=true)
-		println("FLECCS_data3.csv Successfully Read!, NGCC-CCS with thermal storage - option1")
+		println("FLECCS_data3.csv Successfully Read!")
 
 	elseif setup["FLECCS"] == 4
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data4.csv"), header=true), copycols=true)
-		#FLECCS_parameters = DataFrame(CSV.File(joinpath(path,"FLECCS_data4_process_parameters.csv"), header=true), copycols=true)
-
-		println("FLECCS_data4.csv Successfully Read!, NGCC-CCS with thermal storage - option2")
+		println("FLECCS_data4.csv Successfully Read!, NGCC-CCS with thermal storage")
 
 	elseif setup["FLECCS"] == 5
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data5.csv"), header=true), copycols=true)
-		#FLECCS_parameters = DataFrame(CSV.File(joinpath(path,"FLECCS_data5_process_parameters.csv"), header=true), copycols=true)
 		println("FLECCS_data5.csv Successfully Read!, NGCC-CCS with hydrogen generation and storage")
 
 	elseif setup["FLECCS"] == 6
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data6.csv"), header=true), copycols=true)
-		#FLECCS_parameters = DataFrame(CSV.File(joinpath(path,"FLECCS_data6_process_parameters.csv"), header=true), copycols=true)
-		println("FLECCS_data6.csv Successfully Read!, NGCC-CCS with DAC")
+		println("FLECCS_data6.csv Successfully Read!, NGCC-CCS with Gatech - DAC")
 
 	elseif setup["FLECCS"] == 7
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data7.csv"), header=true), copycols=true)
-		#FLECCS_parameters =  DataFrame(CSV.File(joinpath(path,"FLECCS_data7_process_parameters.csv"), header=true), copycols=true)
 		println("FLECCS_data7.csv Successfully Read!, NGCC-CCS with DAC-MIT")
 
 	elseif setup["FLECCS"] == 8
 		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data8.csv"), header=true), copycols=true)
-		#FLECCS_parameters = DataFrame(CSV.File(joinpath(path,"FLECCS_data8_process_parameters.csv"), header=true), copycols=true)
 		println("FLECCS_data8.csv Successfully Read!, Allam cycle")
-	elseif setup["FLECCS"] == 9
-		dfGen_ccs = DataFrame(CSV.File(joinpath(path,"FLECCS_data9.csv"), header=true), copycols=true)
-		println("FLECCS_data9.csv Successfully Read!, NGCC-CCS with retrofit")
 	end
 
 	inputs_ccs["n_F"] =nrow(dfGen_ccs)
@@ -267,11 +253,29 @@ function load_fleccs_data(setup::Dict, path::AbstractString,  inputs_ccs::Dict, 
 	    inputs_ccs["BOP_id"] = dfGen_ccs[(dfGen_ccs[!,:BOP].==1),:FLECCS_NO][1]
 
 	elseif setup["FLECCS"] == 5
-		println("FLECCS_data4.csv Successfully Read!, NGCC-CCS coupled with H2 generation and storage")
+		
 	elseif setup["FLECCS"] == 6
-		println("FLECCS_data5.csv Successfully Read!, NGCC-CCS coupled with DAC (Gtech or Upitt)")
+		#gatech
+		# gas turbine
+	    inputs_ccs["NGCT_id"] = dfGen_ccs[(dfGen_ccs[!,:TURBINE].==1),:FLECCS_NO][1]
+	    # steam turbine
+	    inputs_ccs["NGST_id"] = dfGen_ccs[(dfGen_ccs[!,:TURBINE].==2),:FLECCS_NO][1]
+	    # absorber
+	    inputs_ccs["PCC_id"] = dfGen_ccs[(dfGen_ccs[!,:ABSORBER].==1),:FLECCS_NO][1]
+	    # compressor
+	    inputs_ccs["Comp_id"] = dfGen_ccs[(dfGen_ccs[!,:COMPRESSOR].==1),:FLECCS_NO][1]
+        # DAC 1 absorb
+		inputs_ccs["DAC1_id"] = dfGen_ccs[(dfGen_ccs[!,:DAC1].==1),:FLECCS_NO][1]
+		# DAC 2 desorb
+		inputs_ccs["DAC2_id"] = dfGen_ccs[(dfGen_ccs[!,:DAC2].==1),:FLECCS_NO][1]
+		# DAC 3 sorbent
+		inputs_ccs["DAC3_id"] = dfGen_ccs[(dfGen_ccs[!,:DAC3].==1),:FLECCS_NO][1]
+	    #BOP
+	    inputs_ccs["BOP_id"] = dfGen_ccs[(dfGen_ccs[!,:BOP].==1),:FLECCS_NO][1]
+
+		
 	elseif setup["FLECCS"] == 7
-		println("FLECCS_data7.csv Successfully Read!, NGCC-CCS coupled with DAC (MIT)")
+
 		# NGCC ID
 		inputs_ccs["NGCC_id"] = dfGen_ccs[(dfGen_ccs[!,:NGCC].==1),:FLECCS_NO][1]
 	    # CAL unit
@@ -279,7 +283,7 @@ function load_fleccs_data(setup::Dict, path::AbstractString,  inputs_ccs::Dict, 
 	    # DAC unit
 	    inputs_ccs["DAC_id"] = dfGen_ccs[(dfGen_ccs[!,:DAC].==1),:FLECCS_NO][1]
 	elseif setup["FLECCS"] == 8
-		println("FLECCS_data8.csv Successfully Read!, Allam cycle coupled with CO2 storage")
+		
 		inputs_ccs["OXY_id"] = dfGen_ccs[(dfGen_ccs[!,:OXY].==1),:FLECCS_NO][1]
 	    # steam turbine
 	    inputs_ccs["ASU_id"] = dfGen_ccs[(dfGen_ccs[!,:ASU].==1),:FLECCS_NO][1]
