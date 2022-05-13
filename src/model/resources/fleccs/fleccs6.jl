@@ -111,6 +111,7 @@ function fleccs6(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
 	# eq2. 
 	@expression(EP, ePower_st[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P2_1][1+n*(y-1)] * vP_gt[y,t] + dfGen_ccs[!,:P2_2][1+n*(y-1)]* vREGEN_dac[y,t] + dfGen_ccs[!,:P2_3][1+n*(y-1)]* vCAPTURE_pcc[y,t] )
     
+	#@constraint(EP, [y in FLECCS_ALL,t=1:T],ePower_st[y,t] >=  vP_gt[y,t] *  dfGen_ccs[!,:P2_0][1+n*(y-1)])
 	# CO2 generated from flue gas is a function eFuel
 	# eq 3
 	@expression(EP, eCO2_flue[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P3][1+n*(y-1)] * eFuel[y,t])
@@ -157,12 +158,11 @@ function fleccs6(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
 	@expression(EP, eSteam_dac[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P14][1+n*(y-1)] * vREGEN_dac[y,t])
 
 	#eq 16
-	@constraint(EP,[y in FLECCS_ALL,t=1:T], eSteam_dac[y,t] <= dfGen_ccs[!,:P14][1+n*(y-1)] * vP_gt[y,t] + dfGen_ccs[!,:P14][1+n*(y-1)] * EP[:eTotalCapFLECCS][y, PCC_id])
+	@constraint(EP,[y in FLECCS_ALL,t=1:T], eSteam_dac[y,t] <= dfGen_ccs[!,:P16_1][1+n*(y-1)] * vP_gt[y,t] + dfGen_ccs[!,:P16_2][1+n*(y-1)] * EP[:eTotalCapFLECCS][y, PCC_id])
 
 	#eq 17
 	@expression(EP, ePower_use_dac[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P17][1+n*(y-1)] * vCAPTURE_dac[y,t])
 
-	#skip eq 18 for now
 
 	#eq 19
 	@expression(EP, eCO2_vent_compress[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P19][1+n*(y-1)] * vREGEN_dac[y,t])
@@ -196,12 +196,9 @@ function fleccs6(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
 		[y in FLECCS_ALL, i in NGST_id,t = 1:T],EP[:vFLECCS_output][y,i,t] == ePower_st[y,t]	
 		[y in FLECCS_ALL, i in Comp_id, t =1:T],EP[:vFLECCS_output][y,i,t] == eCO2_compressed[y,t]	
 		[y in FLECCS_ALL, i in PCC_id,t = 1:T],EP[:vFLECCS_output][y,i,t] == vCAPTURE_pcc[y,t]
-
 		[y in FLECCS_ALL, i in DAC1_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vCAPTURE_dac[y,t]
 		[y in FLECCS_ALL, i in DAC2_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vREGEN_dac[y,t]	
-
 		[y in FLECCS_ALL, i in DAC3_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vSORBENT_fresh[y,t] * dfGen_ccs[!,:pCAPRatio_dac][1+n*(y-1)]
-
 		[y in FLECCS_ALL, i in BOP_id, t =1:T],EP[:vFLECCS_output][y,i,t] == eCCS_net[y,t]			
 	end)
 
