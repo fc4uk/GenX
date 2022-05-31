@@ -70,21 +70,24 @@ function co2_tax(EP::Model, inputs::Dict, setup::Dict)
 
 	### Expressions ###
 	#CO2 Tax
+	# sum up the CO2 emissions from each zone
 	@expression(EP, eCO2Sum[z=1:Z], sum(inputs["omega"][t]*EP[:eEmissionsByZone][z,t] for t in 1:T))
+	# non-negative CO2 emissions constraints
 	@constraint(EP,[z=1:Z], eCO2Sum[z] >= 0 )
+	# CO2 emissions * CO2 tax
 	@expression(EP, eCCO2Tax[z=1:Z], inputs["dfCO2Tax"][!,"CO2Tax"][z] * eCO2Sum[z])
+	# total CO2 emissions of all the evaluated zones
 	@expression(EP, eTotalCCO2Tax,sum(eCCO2Tax[z] for z in 1:Z))
 
 	# also add the cost associated co2 sequestration
-
-
-			
+	# eCO2SequestrationSum only include the CO2 sequestration from "generator_data.csv", CO2 sequestration costs assocaited with FLECCS are already added in fleccs modules.
 	@expression(EP, eCO2SequestrationSum[z=1:Z],
 		if setup["PieceWiseHeatRate"] ==1
 			sum(inputs["omega"][t]*EP[:eCO2SequestrationByZone][z,t] for t in 1:T)
 		end
 	)
 	
+	# right now, eCO2SequestrationSum should be added into objective function if piecewise heat rate is included
 	if setup["PieceWiseHeatRate"] ==1
 		@expression(EP, eTotalCCO2Sequestration,sum(eCO2SequestrationSum[z] for z in 1:Z))
 		EP[:eObj] = EP[:eObj] + eTotalCCO2Tax + eTotalCCO2Sequestration

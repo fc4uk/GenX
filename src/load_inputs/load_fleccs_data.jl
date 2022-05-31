@@ -282,6 +282,8 @@ function load_fleccs_data(setup::Dict, path::AbstractString,  inputs_ccs::Dict, 
 	    inputs_ccs["CAL_id"] = dfGen_ccs[(dfGen_ccs[!,:CAL].==1),:FLECCS_NO][1]
 	    # DAC unit
 	    inputs_ccs["DAC_id"] = dfGen_ccs[(dfGen_ccs[!,:DAC].==1),:FLECCS_NO][1]
+
+		inputs_ccs["BOP_id"] = dfGen_ccs[(dfGen_ccs[!,:BOP].==1),:FLECCS_NO][1]
 	elseif setup["FLECCS"] == 8
 		
 		inputs_ccs["OXY_id"] = dfGen_ccs[(dfGen_ccs[!,:OXY].==1),:FLECCS_NO][1]

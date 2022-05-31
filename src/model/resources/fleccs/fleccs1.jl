@@ -44,7 +44,6 @@ function fleccs1(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
     @variables(EP, begin
         # Continuous decision variables
         vP_gt[y in FLECCS_ALL, 1:T]  >= 0 # generation from combustion TURBINE (gas TURBINE)
-        vP_ccs_net[y in FLECCS_ALL, 1:T]  >= 0 # net generation from NGCC-CCS coupled with solvent storage
     end)
 
 	# variales related to CO2 and solvent

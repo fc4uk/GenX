@@ -95,34 +95,41 @@ function fleccs7(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
 	@constraint(EP, [y in FLECCS_ALL, t = 1:T],
 		vFuel_use_NGCC[y,t] >= vP_NGCC[y,t]*dfGen_ccs[!,:c2][y] + EP[:vCOMMIT_FLECCS][y, NGCC_id, t]*dfGen_ccs[!,:d2][y])
 	#@expression(EP, vFuel_use_NGCC[y in FLECCS_ALL, t = 1:T], vP_NGCC[y,t] * 6.8)
+
+
     # (1) Molar flow rate of CO2 in the flue gas, eCO2use (kmol/hr) = 1:35eFuel_use_NGCCt (MMBtu/hr), p1 =  1.35
-    @expression(EP, eCO2_flue[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:p1][1+n*(y-1)] * vFuel_use_NGCC[y,t])
-    # (5) Molar flow rate of fuel into the calciner block, need to define eFuel_use_calciner first before using it in a formulation.
-	@expression(EP, eFuel_use_calciner[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:p5][1+n*(y-1)] * vP_NGCC[y,t] + dfGen_ccs[!,:p6][1+n*(y-1)] * vCaCO3_use_calciner[y,t] +  EP[:vCOMMIT_FLECCS][y, NGCC_id, t]* dfGen_ccs[!,:p7][1+n*(y-1)])
+    @expression(EP, eCO2_flue[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P1_1][1+n*(y-1)] * vFuel_use_NGCC[y,t])
+	# (5) Molar flow rate of fuel into the calciner block, need to define eFuel_use_calciner first before using it in a formulation.
+	@expression(EP, eFuel_use_calciner[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P5_1][1+n*(y-1)] * vP_NGCC[y,t] + dfGen_ccs[!,:P5_2][1+n*(y-1)] * vCaCO3_use_calciner[y,t] +  EP[:vCOMMIT_FLECCS][y, NGCC_id, t]* dfGen_ccs[!,:P5_3][1+n*(y-1)])
 	# (2) Molar flow rate of CO2 from the calciner
-    @expression(EP, eCO2_calciner[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:p1][1+n*(y-1)] * eFuel_use_calciner[y,t] + vCaCO3_use_calciner[y,t] + eCO2_flue[y,t])
-	# (3) CO2 vented to the atmosphere
-	@expression(EP, eCO2_vent[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:p2][1+n*(y-1)] * vP_NGCC[y,t] + dfGen_ccs[!,:p3][1+n*(y-1)] * vCaCO3_use_calciner[y,t] +  EP[:vCOMMIT_FLECCS][y, NGCC_id, t]*dfGen_ccs[!,:p4][1+n*(y-1)])
+    @expression(EP, eCO2_calciner[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P2_1][1+n*(y-1)] * vP_NGCC[y,t] + dfGen_ccs[!,:P2_2][1+n*(y-1)] *vCaCO3_use_calciner[y,t] + EP[:vCOMMIT_FLECCS][y, NGCC_id, t]*dfGen_ccs[!,:P2_3][1+n*(y-1)] )
+	
+    # (3) CO2 vented to the atmosphere
+	@expression(EP, eCO2_vent[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P3_1][1+n*(y-1)] * vP_NGCC[y,t] + dfGen_ccs[!,:P3_2][1+n*(y-1)] * vCaCO3_use_calciner[y,t] +  EP[:vCOMMIT_FLECCS][y, NGCC_id, t]*dfGen_ccs[!,:P3_3][1+n*(y-1)])
+    
 	# (4) Molar flow rate of CO2 exiting the separation block
 	@expression(EP, CO2_liquified[y in FLECCS_ALL,t=1:T], eCO2_calciner[y,t] - eCO2_vent[y,t])
 	
 	# (6) Net power required by block with calcium loop
-    @expression(EP, vP_calciner[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:p8][1+n*(y-1)] * vP_NGCC[y,t] + dfGen_ccs[!,:p9][1+n*(y-1)] * vCaCO3_use_calciner[y,t] + EP[:vCOMMIT_FLECCS][y, NGCC_id, t]* dfGen_ccs[!,:p10][1+n*(y-1)])
-    # (7) Molar flow rate of CaO from the block with calcium loop
+    @expression(EP, vP_calciner[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P6_1][1+n*(y-1)] * vP_NGCC[y,t] + dfGen_ccs[!,:P6_2][1+n*(y-1)] * vCaCO3_use_calciner[y,t] + EP[:vCOMMIT_FLECCS][y, NGCC_id, t]* dfGen_ccs[!,:P6_3][1+n*(y-1)])
+    
+	# (7) Molar flow rate of CaO from the block with calcium loop
     @expression(EP, CaO_out_calciner[y in FLECCS_ALL,t=1:T], vCaCO3_use_calciner[y,t])
+
     # (8) Net power required by DAC
-    @expression(EP, vP_use_DAC[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:p11][1+n*(y-1)] * eCO2_calciner[y,t])
-    # (9) Net power produced by the overall plant (vP_out = eCCS_net) ///is it meant to be @expression(EP, eCCS_net[y in FLECCS_ALL,t=1:T], vP_NGCC[y,t] + vP_calciner[y,t] + vP_use_DAC[y,t])
+    @expression(EP, vP_use_DAC[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:P8_1][1+n*(y-1)] * vCaCO3_use_calciner[y,t])
+   
+	# (9) Net power produced by the overall plant (vP_out = eCCS_net) ///is it meant to be @expression(EP, eCCS_net[y in FLECCS_ALL,t=1:T], vP_NGCC[y,t] + vP_calciner[y,t] + vP_use_DAC[y,t])
     @expression(EP, eCCS_net[y in FLECCS_ALL,t=1:T], vP_NGCC[y,t] - vP_calciner[y,t] - vP_use_DAC[y,t])
 
-	# (13) Used CaO is protional to the CO2 captured by atmosphere, need to reorder those equations.
+	# (12) Used CaO is protional to the CO2 captured by atmosphere, need to reorder those equations.
 	@expression(EP, CaO_use[y in FLECCS_ALL,t=1:T], vCO2_atmosphere[y,t]/dfGen_ccs[!,:alpha][1+n*(y-1)])
-	# (12) Moles of fully converted CaO particles exported from DAC
+	# (11) Moles of fully converted CaO particles exported from DAC
 	#@constraint(EP, [y in FLECCS_ALL,t=1:24], CaO_use[y,t] == CaO_out_calciner[y,t+8736])
-	@constraint(EP, [y in FLECCS_ALL,t=1:12], CaO_use[y,t] == 0)
-	@constraint(EP, [y in FLECCS_ALL,t=13:T], CaO_use[y,t] ==CaO_out_calciner[y,t-12])
+	@constraint(EP, [y in FLECCS_ALL,t=1:24], CaO_use[y,t] == 0)
+	@constraint(EP, [y in FLECCS_ALL,t=25:T], CaO_use[y,t] ==CaO_out_calciner[y,t-24])
 
-	# (11) Moles of CaO in the DAC block
+	# (10) Moles of CaO in the DAC block
     # dynamic of DAC system, normal [tonne solvent/sorbent]
     @constraint(EP, [y in FLECCS_ALL, t in INTERIOR_SUBPERIODS],nCaO_DAC[y, t] == nCaO_DAC[y, t-1] +  (CaO_out_calciner[y,t] - CaO_use[y,t]))
     # dynamic of DAC system, wrapping [tonne solvent/sorbent]
@@ -139,8 +146,8 @@ function fleccs7(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
 
 
 	@constraint(EP,[y in FLECCS_ALL, t=1:T], vCaCO3_use_calciner[y,t] >= EP[:eTotalCapFLECCS][y, NGCC_id] * 3000/688)
-	@constraint(EP,[y in FLECCS_ALL, t=1:T], vCaCO3_use_calciner[y,t] <= EP[:eTotalCapFLECCS][y, NGCC_id] * 20000/688)
-	@constraint(EP,[y in FLECCS_ALL, t=1:T], nCaO_DAC[y,t] <= EP[:eTotalCapFLECCS][y, NGCC_id] * 200000/688)
+	@constraint(EP,[y in FLECCS_ALL, t=1:T], vCaCO3_use_calciner[y,t] <= EP[:eTotalCapFLECCS][y, NGCC_id] * 6500/688)
+	@constraint(EP,[y in FLECCS_ALL, t=1:T], nCaO_DAC[y,t] <= EP[:eTotalCapFLECCS][y, NGCC_id] * 156000/688)
 
 
 	@constraints(EP, begin
@@ -170,6 +177,10 @@ function fleccs7(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
 	#adding up variable costs
 	@expression(EP,eVar_FLECCS[t = 1:T], sum(eCVar_fuel[y,t] + eCVar_CaCO3[y,t] +  eCVar_CaCO_transport[y,t] + eCVar_CO2_sequestration[y,t] for y in FLECCS_ALL))
 	@expression(EP,eTotalCVar_FLECCS, sum(eVar_FLECCS[t] for t in 1:T))
+
+    #The fixed cost, c1 = 0.15 $M/MW/yr is combined with CAPEX_tx so you could see CAPEX_tx = 8382 + 150000 = 158382
+
+
 	EP[:eObj] += eTotalCVar_FLECCS
 	return EP
 end
