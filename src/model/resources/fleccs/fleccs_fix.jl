@@ -23,7 +23,7 @@ The total capacity of each resource is defined as the sum of the existing capaci
 
 """
 
-function fleccs_fix(EP::Model, inputs::Dict,  FLECCS::Int, UCommit::Int, Reserves::Int)
+function fleccs_fix(EP::Model, inputs::Dict,   UCommit::Int)
 
 	println(" FLECCS investment and fix cost Module")
 

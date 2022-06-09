@@ -20,7 +20,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 The FLECCS7 module creates decision variables, expressions, and constraints related to FLECCS Process with DAC (MIT). In this module, we will write up all the constraints formulations associated with the power plant.
 """
 
-function fleccs7(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::Int)
+function fleccs7(EP::Model, inputs::Dict)
 
 	println("FLECCS7, FLECCS Process with DAC (MIT)")
 

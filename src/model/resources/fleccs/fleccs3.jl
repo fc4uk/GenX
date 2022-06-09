@@ -22,7 +22,7 @@ The FLECCS3 module creates decision variables, expressions, and constraints rela
 This module uses the following 'helper' functions in separate files: FLECCS2_commit() for FLECCS subcompoents subject to unit commitment decisions and constraints (if any) and FLECCS2_no_commit() for FLECCS subcompoents not subject to unit commitment (if any).
 """
 
-function fleccs3(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::Int)
+function fleccs3(EP::Model, inputs::Dict)
 
 	println("FLECCS2, NGCC coupled with solvent storage Resources Module - Aux boiler - 8 Rivers")
 
@@ -183,7 +183,7 @@ function fleccs3(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::I
 		[y in FLECCS_ALL, i in Rich_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vSTORE_rich[y,t]
 		[y in FLECCS_ALL, i in Lean_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vSTORE_lean[y,t]	
 
-		[y in FLECCS_ALL, i in BOP_id, t =1:T],EP[:vFLECCS_output][y,i,t] == eCCS_net[y,t]			
+		#[y in FLECCS_ALL, i in BOP_id, t =1:T],EP[:vFLECCS_output][y,i,t] == eCCS_net[y,t]			
 	end)
 
 	@constraint(EP, [y in FLECCS_ALL], EP[:eTotalCapFLECCS][y, BOP_id] == EP[:eTotalCapFLECCS][y, NGCT_id]+ EP[:eTotalCapFLECCS][y,NGST_id])

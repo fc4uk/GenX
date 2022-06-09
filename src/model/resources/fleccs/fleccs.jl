@@ -28,7 +28,7 @@ FLECCS7 = NGCC coupled  with lime based DAC
 FLECCS8 = Allam cycle coupled with LOX storage 
 """
 
-function fleccs(EP::Model, inputs::Dict, FLECCS::Int,  UCommit::Int, Reserves::Int, CapacityReserveMargin::Int, MinCapReq::Int)
+function fleccs(EP::Model, inputs::Dict,  FLECCS::Int, UCommit::Int, CapacityReserveMargin::Int, MinCapReq::Int)
 	# load FLECCS fixed and investment module
 	println("load FLECCS module")
 	# FLECCS
@@ -36,6 +36,7 @@ function fleccs(EP::Model, inputs::Dict, FLECCS::Int,  UCommit::Int, Reserves::I
 	FLECCS_ALL = inputs["FLECCS_ALL"]
 	COMMIT_ccs = inputs["COMMIT_CCS"]
 	NO_COMMIT_ccs = inputs["NO_COMMIT_CCS"]
+	
 
 
 	T = inputs["T"]     # Number of time steps (hours)
@@ -43,39 +44,39 @@ function fleccs(EP::Model, inputs::Dict, FLECCS::Int,  UCommit::Int, Reserves::I
 	N_F = inputs["N_F"]
 	n = length(N_F)
 
-	EP = fleccs_fix(EP, inputs, FLECCS,  UCommit, Reserves)
+	EP = fleccs_fix(EP, inputs,  UCommit)
 
 	# create a container to store the output variables from each subcompoent
 	@variable(EP, vFLECCS_output[y in FLECCS_ALL, i in N_F, 1:T]  >= 0)
 
 
 	if !isempty(NO_COMMIT_ccs)
-		EP = fleccs_no_commit(EP, inputs, FLECCS, Reserves)
+		EP = fleccs_no_commit(EP, inputs)
 	end
 
 
 	if !isempty(COMMIT_ccs)
-		EP = fleccs_commit(EP, inputs, FLECCS,UCommit, Reserves)
+		EP = fleccs_commit(EP, inputs, UCommit)
 	end
 
 	if FLECCS ==1
-		EP = fleccs1(EP, inputs, FLECCS, UCommit, Reserves)
+		EP = fleccs1(EP, inputs)
 	elseif FLECCS ==2
-		EP = fleccs2(EP, inputs, FLECCS,UCommit, Reserves)
+		EP = fleccs2(EP, inputs)
 	elseif FLECCS ==3
-		EP = fleccs3(EP, inputs, FLECCS, UCommit, Reserves)
+		EP = fleccs3(EP, inputs)
 	elseif FLECCS ==4
-		EP = fleccs4(EP, inputs, FLECCS, UCommit, Reserves)
+		EP = fleccs4(EP, inputs)
 	elseif FLECCS ==5
-		EP = fleccs5(EP, inputs,  FLECCS, UCommit, Reserves)
+		EP = fleccs5(EP, inputs)
 	elseif FLECCS ==6
-		EP = fleccs6(EP, inputs, FLECCS, UCommit, Reserves)
+		EP = fleccs6(EP, inputs)
 	elseif FLECCS ==7
-		EP = fleccs7(EP, inputs, FLECCS, UCommit, Reserves)
+		EP = fleccs7(EP, inputs)
 	elseif FLECCS ==8
-		EP = fleccs8(EP, inputs, FLECCS, UCommit, Reserves)
+		EP = fleccs8(EP, inputs)
 	elseif FLECCS ==9
-		EP = fleccs9(EP, inputs, FLECCS, UCommit, Reserves)
+		EP = fleccs9(EP, inputs)
 	end
 
 

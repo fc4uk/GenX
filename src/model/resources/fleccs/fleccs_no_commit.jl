@@ -57,7 +57,7 @@ When not modeling regulation and reserves, thermal units not subject to unit com
 ```
 (See Constraints 3-4 in the code)
 """
-function fleccs_no_commit(EP::Model, inputs::Dict, FLECCS::Int, Reserves::Int)
+function fleccs_no_commit(EP::Model, inputs::Dict)
 
 	println("FLECCS (No Unit Commitment) Resources Module")
 
@@ -102,9 +102,6 @@ function fleccs_no_commit(EP::Model, inputs::Dict, FLECCS::Int, Reserves::Int)
 
 	### Minimum and maximum power output constraints (Constraints #3-4)
 	@constraints(EP, begin
-	    # gas turbine
-		# Minimum stable power generated per technology "y" at hour "t" Min_Power
-		[y in FLECCS_ALL,i in NO_COMMIT_ccs, t=1:T], EP[:vFLECCS_output][y,i,t] >= dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Min_Power][i]*EP[:eTotalCapFLECCS][y,i]
 		# Maximum power generated per technology "y" at hour "t"
 		[y in FLECCS_ALL,i in NO_COMMIT_ccs, t=1:T], EP[:vFLECCS_output][y,i,t] <= EP[:eTotalCapFLECCS][y,i]
 

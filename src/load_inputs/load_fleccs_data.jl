@@ -253,6 +253,22 @@ function load_fleccs_data(setup::Dict, path::AbstractString,  inputs_ccs::Dict, 
 	    inputs_ccs["BOP_id"] = dfGen_ccs[(dfGen_ccs[!,:BOP].==1),:FLECCS_NO][1]
 
 	elseif setup["FLECCS"] == 5
+		# gas turbine
+		inputs_ccs["NGCT_id"] = dfGen_ccs[(dfGen_ccs[!,:TURBINE].==1),:FLECCS_NO][1]
+	    # steam turbine
+	    inputs_ccs["NGST_id"] = dfGen_ccs[(dfGen_ccs[!,:TURBINE].==2),:FLECCS_NO][1]
+	    # PCC
+	    inputs_ccs["PCC_id"] = dfGen_ccs[(dfGen_ccs[!,:PCC].==1),:FLECCS_NO][1]
+	    # compressor
+	    inputs_ccs["Comp_id"] = dfGen_ccs[(dfGen_ccs[!,:COMPRESSOR].==1),:FLECCS_NO][1]
+        # electrolyzer
+        inputs_ccs["Electrolyzer_id"] = dfGen_ccs[(dfGen_ccs[!,:ELECTROLYZER].==1),:FLECCS_NO][1]
+        # h2 compressor
+        inputs_ccs["H2_Compressor_id"] = dfGen_ccs[(dfGen_ccs[!,:H2_COMPRESSOR].==1),:FLECCS_NO][1]
+        # h2 tank 
+        inputs_ccs["H2_Tank_id"] = dfGen_ccs[(dfGen_ccs[!,:H2_TANK].==1),:FLECCS_NO][1]
+	    #BOP
+	    inputs_ccs["BOP_id"] = dfGen_ccs[(dfGen_ccs[!,:BOP].==1),:FLECCS_NO][1]
 		
 	elseif setup["FLECCS"] == 6
 		#gatech

@@ -139,7 +139,7 @@ where $\tau_{y,z}^{up|down}$ is the minimum up or down time for units in generat
 
 Like with the ramping constraints, the minimum up and down constraint time also wrap around from the start of each time period to the end of each period.
 """
-function fleccs_commit(EP::Model, inputs::Dict,FLECCS::Int,UCommit::Int,  Reserves::Int)
+function fleccs_commit(EP::Model, inputs::Dict, UCommit::Int)
 
 	println("FLECCS (Unit Commitment) Resources Module")
 

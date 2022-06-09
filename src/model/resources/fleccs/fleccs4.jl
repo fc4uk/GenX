@@ -22,7 +22,7 @@ The FLECCS3 module creates decision variables, expressions, and constraints rela
 This module uses the following 'helper' functions in separate files: FLECCS2_commit() for FLECCS subcompoents subject to unit commitment decisions and constraints (if any) and FLECCS2_no_commit() for FLECCS subcompoents not subject to unit commitment (if any).
 """
 
-function fleccs4(EP::Model, inputs::Dict,  FLECCS::Int, UCommit::Int, Reserves::Int)
+function fleccs4(EP::Model, inputs::Dict)
 
 	println("FLECCS4, NGCC coupled with thermal storage Module, using heater to generate energy")
 

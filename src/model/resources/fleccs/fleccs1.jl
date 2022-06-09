@@ -20,7 +20,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 The FLECCS1 module creates decision variables, expressions, and constraints related to NGCC-CCS coupled with solvent storage systems. In this module, we will write up all the constraints formulations associated with the power plant.
 """
 
-function fleccs1(EP::Model, inputs::Dict, FLECCS::Int, UCommit::Int, Reserves::Int)
+function fleccs1(EP::Model, inputs::Dict)
 
 	println("FLECCS1, conventional NGCC-CCS with venting option")
 
