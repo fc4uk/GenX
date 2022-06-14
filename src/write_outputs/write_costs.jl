@@ -46,7 +46,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		#cVar = value(EP[:eTotalCVarOut])+(!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0)
 		cFix = value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0)
 		if setup["FLECCS"] >= 1
-			cVar = cVar + value.(EP[:eTotalCVar_FLECCS]) +  value.(EP[:eTotalCCO2Tax])
+			cVar = cVar + value.(EP[:eTotalCVar_FLECCS]) 
 			cFix = cFix  + value.(EP[:eTotalCFixFLECCS]) + value.(EP[:eTotalCFLECCS_tx])
 		end
 		dfCost[!,Symbol("Total")] = [objective_value(EP), cFix, cVar, value(EP[:eTotalCNSE]), 0, 0, 0]

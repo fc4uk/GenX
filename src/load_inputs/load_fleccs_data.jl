@@ -218,19 +218,23 @@ function load_fleccs_data(setup::Dict, path::AbstractString,  inputs_ccs::Dict, 
 	    inputs_ccs["BOP_id"] = dfGen_ccs[(dfGen_ccs[!,:BOP].==1),:FLECCS_NO][1]
 
 	elseif setup["FLECCS"] == 3
-		inputs_ccs["NGCT_id"] = dfGen_ccs[(dfGen_ccs[!,:TURBINE].==1),:FLECCS_NO][1]
+	    # get the ID of each subcompoents
+	    # gas turbine
+	    inputs_ccs["NGCT_id"] = dfGen_ccs[(dfGen_ccs[!,:TURBINE].==1),:FLECCS_NO][1]
 	    # steam turbine
 	    inputs_ccs["NGST_id"] = dfGen_ccs[(dfGen_ccs[!,:TURBINE].==2),:FLECCS_NO][1]
-	    # PCC
-	    inputs_ccs["PCC_id"] = dfGen_ccs[(dfGen_ccs[!,:PCC].==1),:FLECCS_NO][1]
+	    # absorber
+	    inputs_ccs["Absorber_id"] = dfGen_ccs[(dfGen_ccs[!,:ABSORBER].==1),:FLECCS_NO][1]
+	    # regenerator
+	    inputs_ccs["Regen_id"] = dfGen_ccs[(dfGen_ccs[!,:REGEN].==1),:FLECCS_NO][1]
 	    # compressor
 	    inputs_ccs["Comp_id"] = dfGen_ccs[(dfGen_ccs[!,:COMPRESSOR].==1),:FLECCS_NO][1]
-        #Hot tank
-        inputs_ccs["Hot_id"] = dfGen_ccs[(dfGen_ccs[!,:STORAGE].==1),:FLECCS_NO][1]
-        #Cold tank
-        inputs_ccs["Cold_id"] = dfGen_ccs[(dfGen_ccs[!,:STORAGE].==2),:FLECCS_NO][1]
-        # heat pump
-        inputs_ccs["HeatPump_id"] = dfGen_ccs[(dfGen_ccs[!,:HEATPUMP].==1),:FLECCS_NO][1]
+	    #Rich tank
+		inputs_ccs["Rich_id"] = dfGen_ccs[(dfGen_ccs[!,:SOLVENT].==1),:FLECCS_NO][1]
+	    #lean tank
+	    inputs_ccs["Lean_id"] = dfGen_ccs[(dfGen_ccs[!,:SOLVENT].==2),:FLECCS_NO][1]
+		# AUX id
+		inputs_ccs["AUX_id"] = dfGen_ccs[(dfGen_ccs[!,:AUX].==1),:FLECCS_NO][1]
 	    #BOP
 	    inputs_ccs["BOP_id"] = dfGen_ccs[(dfGen_ccs[!,:BOP].==1),:FLECCS_NO][1]
 	elseif setup["FLECCS"] == 4
