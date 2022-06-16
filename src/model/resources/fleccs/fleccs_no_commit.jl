@@ -101,20 +101,8 @@ function fleccs_no_commit(EP::Model, inputs::Dict)
 
 
 	### Minimum and maximum power output constraints (Constraints #3-4)
-	@constraints(EP, begin
-		# Maximum power generated per technology "y" at hour "t"
-		[y in FLECCS_ALL,i in NO_COMMIT_ccs, t=1:T], EP[:vFLECCS_output][y,i,t] <= EP[:eTotalCapFLECCS][y,i]
-
-    end)
-
-
-	# END Constraints for FLECCS resources not subject to unit commitment
-
-	##### CO2 emissioms
-
-	# Add CO2 from start up fuel and vented CO2
-	#@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], EP[:eCO2_vent][y,t])
-
+	@constraints(EP,
+		[y in FLECCS_ALL,i in NO_COMMIT_ccs, t=1:T], EP[:vFLECCS_output][y,i,t] <= EP[:eTotalCapFLECCS][y,i])
 
 	return EP
 end
