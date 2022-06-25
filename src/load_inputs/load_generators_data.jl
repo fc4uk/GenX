@@ -47,13 +47,15 @@ function load_generators_data(setup::Dict, path::AbstractString, inputs_gen::Dic
 
 	# Set of storage resources with long duration storage capabilitites
 	inputs_gen["STOR_HYDRO_LONG_DURATION"] = gen_in[(gen_in.LDS.==1) .& (gen_in.HYDRO.==1),:R_ID]
-	inputs_gen["STOR_LONG_DURATION"] = gen_in[(gen_in.LDS.==1) .& (gen_in.STOR.==1),:R_ID]
-	inputs_gen["STOR_SHORT_DURATION"] = gen_in[(gen_in.LDS.==0) .& (gen_in.STOR.==1),:R_ID]
+	inputs_gen["STOR_LONG_DURATION"] = gen_in[(gen_in.LDS.==1) .& (gen_in.STOR.>=1),:R_ID]
+	inputs_gen["STOR_SHORT_DURATION"] = gen_in[(gen_in.LDS.==0) .& (gen_in.STOR.>=1),:R_ID]
 
 	# Set of all reservoir hydro resources
 	inputs_gen["HYDRO_RES"] = gen_in[(gen_in[!,:HYDRO].==1),:R_ID]
 	# Set of reservoir hydro resources modeled with known reservoir energy capacity
-	inputs_gen["HYDRO_RES_KNOWN_CAP"] = intersect(gen_in[gen_in.Hydro_Energy_to_Power_Ratio.>0,:R_ID], inputs_gen["HYDRO_RES"])
+	if !isempty(inputs_gen["HYDRO_RES"])
+		inputs_gen["HYDRO_RES_KNOWN_CAP"] = intersect(gen_in[gen_in.Hydro_Energy_to_Power_Ratio.>0,:R_ID], inputs_gen["HYDRO_RES"])
+	end
 
 	# Set of flexible demand-side resources
 	inputs_gen["FLEX"] = gen_in[gen_in.FLEX.==1,:R_ID]
@@ -63,9 +65,6 @@ function load_generators_data(setup::Dict, path::AbstractString, inputs_gen::Dic
 
 	# Set of controllable variable renewable resources
 	inputs_gen["VRE"] = gen_in[gen_in.VRE.>=1,:R_ID]
-
-	# Set of DAC
-	inputs_gen["DAC"] = gen_in[gen_in.DAC.==1,:R_ID]
 
 	# Set of thermal generator resources
 	if setup["UCommit"]>=1
@@ -112,7 +111,7 @@ function load_generators_data(setup::Dict, path::AbstractString, inputs_gen::Dic
 	inputs_gen["R_ZONES"] = zones
 	inputs_gen["RESOURCE_ZONES"] = inputs_gen["RESOURCES"] .* "_z" .* string.(zones)
 
-	if setup["ParameterScale"] ==1  # Parameter scaling turned on - adjust values of subset of parameter values
+	if setup["ParameterScale"] == 1  # Parameter scaling turned on - adjust values of subset of parameter values
 
 		# The existing capacity of a power plant in megawatts
 		inputs_gen["dfGen"][!,:Existing_Charge_Cap_MW] = gen_in[!,:Existing_Charge_Cap_MW]/ModelScalingFactor # Convert to GW
@@ -124,11 +123,7 @@ function load_generators_data(setup::Dict, path::AbstractString, inputs_gen::Dic
 		# Cap_Size scales only capacities for those technologies with capacity >1
 		# Step 1: convert vector to float
 		inputs_gen["dfGen"][!,:Cap_Size] =convert(Array{Float64}, gen_in[!,:Cap_Size])
-		for g in 1:G  # Scale only those capacities for which Cap_Size > 1
-			if inputs_gen["dfGen"][!,:Cap_Size][g]>1.0
-				inputs_gen["dfGen"][!,:Cap_Size][g] = gen_in[!,:Cap_Size][g]/ModelScalingFactor # Convert to GW
-			end
-		end
+		inputs_gen["dfGen"][!,:Cap_Size] ./= ModelScalingFactor
 
 		# Min capacity terms
 		# Limit on minimum discharge capacity of the resource. -1 if no limit on minimum capacity
@@ -168,16 +163,21 @@ function load_generators_data(setup::Dict, path::AbstractString, inputs_gen::Dic
 		# Variable operations and maintenance cost of the charging aspect of a storage technology with STOR = 2,
 		# or variable operations and maintenance costs associated with flexible demand with FLEX = 1
 		inputs_gen["dfGen"][!,:Var_OM_Cost_per_MWh_In] = gen_in[!,:Var_OM_Cost_per_MWh_In]/ModelScalingFactor # Convert to $ million/GWh with objective function in millions
-		# Cost of providing regulation reserves
-		inputs_gen["dfGen"][!,:Reg_Cost] = gen_in[!,:Reg_Cost]/ModelScalingFactor # Convert to $ million/GW with objective function in millions
-		# Cost of providing spinning reserves
-		inputs_gen["dfGen"][!,:Rsv_Cost] = gen_in[!,:Rsv_Cost]/ModelScalingFactor # Convert to $ million/GW with objective function in millions
-        
-		# scale the intercept if piecewiseheatrate is included 
-		if setup["PieceWiseHeatRate"] == 1
-			inputs_gen["dfGen"][!,:Intercept1] = gen_in[!,:Intercept1]/ModelScalingFactor
-		    inputs_gen["dfGen"][!,:Intercept2] = gen_in[!,:Intercept2]/ModelScalingFactor
-		    inputs_gen["dfGen"][!,:Intercept3] = gen_in[!,:Intercept3]/ModelScalingFactor
+		if setup["Reserves"] >= 1
+			# Cost of providing regulation reserves
+			inputs_gen["dfGen"][!,:Reg_Cost] = gen_in[!,:Reg_Cost]/ModelScalingFactor # Convert to $ million/GW with objective function in millions
+			# Cost of providing spinning reserves
+			inputs_gen["dfGen"][!,:Rsv_Cost] = gen_in[!,:Rsv_Cost]/ModelScalingFactor # Convert to $ million/GW with objective function in millions
+		end
+
+		if setup["MultiStage"] == 1
+			inputs_gen["dfGen"][!,:Min_Retired_Cap_MW] = gen_in[!,:Min_Retired_Cap_MW]/ModelScalingFactor
+			inputs_gen["dfGen"][!,:Min_Retired_Charge_Cap_MW] = gen_in[!,:Min_Retired_Charge_Cap_MW]/ModelScalingFactor
+			inputs_gen["dfGen"][!,:Min_Retired_Energy_Cap_MW] = gen_in[!,:Min_Retired_Energy_Cap_MW]/ModelScalingFactor
+		end
+		# if scale, then the unit becomes Million$/kton.
+		if setup["CO2Capture"] == 1
+			inputs_gen["dfGen"][!, :CO2_Capture_Cost_per_Metric_Ton] /= ModelScalingFactor
 		end
 	end
 
@@ -187,50 +187,22 @@ function load_generators_data(setup::Dict, path::AbstractString, inputs_gen::Dic
 			# Cost per MW of nameplate capacity to start a generator
 			inputs_gen["dfGen"][!,:Start_Cost_per_MW] = gen_in[!,:Start_Cost_per_MW]/ModelScalingFactor # Convert to $ million/GW with objective function in millions
 		end
-
-		# Fuel consumed on start-up (million BTUs per MW per start) if unit commitment is modelled
-		start_fuel = convert(Array{Float64}, collect(skipmissing(gen_in[!,:Start_Fuel_MMBTU_per_MW])))
-		# Fixed cost per start-up ($ per MW per start) if unit commitment is modelled
-		start_cost = convert(Array{Float64}, collect(skipmissing(inputs_gen["dfGen"][!,:Start_Cost_per_MW])))
-		inputs_gen["C_Start"] = zeros(Float64, G, inputs_gen["T"])
-		inputs_gen["dfGen"][!,:CO2_per_Start] = zeros(Float64, G)
 	end
 
-	# Heat rate of all resources (million BTUs/MWh)
-	heat_rate = convert(Array{Float64}, collect(skipmissing(gen_in[!,:Heat_Rate_MMBTU_per_MWh])) )
-	# Fuel used by each resource
-	fuel_type = collect(skipmissing(gen_in[!,:Fuel]))
-	# Maximum fuel cost in $ per MWh and CO2 emissions in tons per MWh
-	inputs_gen["C_Fuel_per_MWh"] = zeros(Float64, G, inputs_gen["T"])
-	inputs_gen["C_Fuel_per_MMBTU"] = zeros(Float64, G, inputs_gen["T"])
-	inputs_gen["dfGen"][!,:CO2_per_MWh] = zeros(Float64, G)
-	inputs_gen["dfGen"][!,:CO2_per_MMBTU] = zeros(Float64, G)
-	for g in 1:G
-		# NOTE: When Setup[ParameterScale] =1, fuel costs are scaled in fuels_data.csv, so no if condition needed to scale C_Fuel_per_MWh
-		inputs_gen["C_Fuel_per_MWh"][g,:] = fuel_costs[fuel_type[g]].*heat_rate[g]
-		inputs_gen["dfGen"][!,:CO2_per_MMBTU][g] = fuel_CO2[fuel_type[g]]
-		inputs_gen["dfGen"][!,:CO2_per_MWh][g] = fuel_CO2[fuel_type[g]]*heat_rate[g]
-		if setup["ParameterScale"] ==1
-			inputs_gen["dfGen"][!,:CO2_per_MWh][g] = inputs_gen["dfGen"][!,:CO2_per_MWh][g] * ModelScalingFactor
-		    inputs_gen["dfGen"][!,:CO2_per_MMBTU][g] = inputs_gen["dfGen"][!,:CO2_per_MMBTU][g] * ModelScalingFactor
-		end
-		# kton/MMBTU * MMBTU/MWh = kton/MWh, to get kton/GWh, we need to mutiply 1000
-		if g in inputs_gen["COMMIT"]
-			# Start-up cost is sum of fixed cost per start plus cost of fuel consumed on startup.
-			# CO2 from fuel consumption during startup also calculated
-
-			inputs_gen["C_Start"][g,:] = inputs_gen["dfGen"][!,:Cap_Size][g] * (fuel_costs[fuel_type[g]] .* start_fuel[g] .+ start_cost[g])
-			# No need to re-scale C_Start since Cap_size, fuel_costs and start_cost are scaled When Setup[ParameterScale] =1 - Dharik
-			inputs_gen["dfGen"][!,:CO2_per_Start][g]  = inputs_gen["dfGen"][!,:Cap_Size][g]*(fuel_CO2[fuel_type[g]]*start_fuel[g])
-			if setup["ParameterScale"] ==1
-				inputs_gen["dfGen"][!,:CO2_per_Start][g] = inputs_gen["dfGen"][!,:CO2_per_Start][g] * ModelScalingFactor
-			end
-			# Setup[ParameterScale] =1, inputs_gen["dfGen"][!,:Cap_Size][g] is GW, fuel_CO2[fuel_type[g]] is ktons/MMBTU, start_fuel is MMBTU/MW,
-			#   thus the overall is MTons/GW, and thus inputs_gen["dfGen"][!,:CO2_per_Start][g] is Mton, to get kton, change we need to multiply 1000
-			# Setup[ParameterScale] =0, inputs_gen["dfGen"][!,:Cap_Size][g] is MW, fuel_CO2[fuel_type[g]] is tons/MMBTU, start_fuel is MMBTU/MW,
-			#   thus the overall is MTons/GW, and thus inputs_gen["dfGen"][!,:CO2_per_Start][g] is ton
+	# if piecewise fuel consumption is on, 
+	# set the C_Fuel_Per_MWh to be zero 
+	# because we will account for fuel consumption in a separate module. 
+	if (setup["PieceWiseHeatRate"] == 1) & (!isempty(inputs_gen["THERM_COMMIT"]))
+		# if the Parameter scaling turned on, the slope stay the same, 
+		# but intercepts should be divided by modeling scale parameter
+		if setup["ParameterScale"] == 1 
+			inputs_gen["dfGen"][!,:Intercept1] = gen_in[!,:Intercept1]/ModelScalingFactor
+			inputs_gen["dfGen"][!,:Intercept2] = gen_in[!,:Intercept2]/ModelScalingFactor
+			inputs_gen["dfGen"][!,:Intercept3] = gen_in[!,:Intercept3]/ModelScalingFactor
 		end
 	end
+
+
 	println("Generators_data.csv Successfully Read!")
 
 	return inputs_gen

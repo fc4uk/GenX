@@ -15,7 +15,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 @doc raw"""
-	ucommit(EP::Model, inputs::Dict, UCommit::Int)
+	ucommit(EP::Model, inputs::Dict, setup::Dict)
 
 This function creates decision variables and cost expressions associated with thermal plant unit commitment or start-up and shut-down decisions (cycling on/off)
 
@@ -38,7 +38,7 @@ The total cost of start-ups across all generators subject to unit commitment ($y
 
 The sum of start-up costs is added to the objective function.
 """
-function ucommit(EP::Model, inputs::Dict, UCommit::Int)
+function ucommit!(EP::Model, inputs::Dict, setup::Dict)
 
 	println("Unit Commitment Module")
 
@@ -63,18 +63,27 @@ function ucommit(EP::Model, inputs::Dict, UCommit::Int)
 
 	## Objective Function Expressions ##
 
-	# Startup costs of "generation" for resource "y" during hour "t"
-	@expression(EP, eCStart[y in COMMIT, t=1:T],(inputs["omega"][t]*inputs["C_Start"][y]*vSTART[y,t]))
+    # Startup costs of "generation" for resource "y" during hour "t"
+	# Fixed cost per start-up if unit commitment is modelled
+    @expression(EP, eCStart[y in COMMIT, t = 1:T], 
+		(dfGen[y, :Start_Cost_per_MW] * vSTART[y, t] * dfGen[y, :Cap_Size]))
 
-	# Julia is fastest when summing over one row one column at a time
-	@expression(EP, eTotalCStartT[t=1:T], sum(eCStart[y,t] for y in COMMIT))
-	@expression(EP, eTotalCStart, sum(eTotalCStartT[t] for t=1:T))
+    # Julia is fastest when summing over one row one column at a time
+    # Sum to plant level
+    @expression(EP, ePlantCStart[y in COMMIT], 
+		sum(inputs["omega"][t] * eCStart[y, t] for t in 1:T))
+    # Sum to zonal level
+    @expression(EP, eZonalCStart[z = 1:Z], 
+		(EP[:vZERO] + sum(ePlantCStart[y] 
+			for y in intersect(COMMIT, dfGen[(dfGen[!, :Zone].==z), :R_ID]))))
+    # Sum to system level
+    @expression(EP, eTotalCStart, sum(eZonalCStart[z] for z = 1:Z))
 
-	EP[:eObj] += eTotalCStart
+	add_to_expression!(EP[:eObj], EP[:eTotalCStart])
 
 	### Constratints ###
 	## Declaration of integer/binary variables
-	if UCommit == 1 # Integer UC constraints
+	if setup["UCommit"] == 1 # Integer UC constraints
 		for y in COMMIT
 			set_integer.(vCOMMIT[y,:])
 			set_integer.(vSTART[y,:])

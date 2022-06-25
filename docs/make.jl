@@ -27,7 +27,13 @@ println(pwd())
 genx_docpath = joinpath(pwd(), "docs/src")
 push!(LOAD_PATH, genx_docpath)
 pages = OrderedDict(
-    "Welcome Page" => "index.md",
+    "Welcome Page" => [
+        "GenX: Introduction" => "index.md",
+        "Running GenX Cases" => "how_to_run_genx.md",
+        "Multi-Stage Capacity Expansion Planning with GenX" => "multi_stage_genx.md",
+        "Limitation of GenX" => "limitations_genx.md",
+        "Third Party Extensions" => "third_party_genx.md"
+    ],
     "Model Concept and Overview" => [
         "Model Introduction" => "model_introduction.md",
         "Notation" => "model_notation.md",
@@ -59,6 +65,19 @@ pages = OrderedDict(
                 "Thermal No Commit" => "thermal_no_commit.md"
             ]
         ],
+        "Multi_stage" => [
+            "Overview" => "multi_stage_model_overview.md",
+            "Load inputs for multi-stage modeling" => [
+                "Configure multi-stage inputs" => "configure_multi_stage_inputs.md",
+                #"Load inputs" => "load_inputs_multi_stage.md",
+                "Load generators data" => "load_generators_data_multi_stage.md",
+                "Load network data" => "load_network_data_multi_stage.md",
+            ],
+            "Model multi stage" => [
+                "Investment multi stage" => "investment_multi_stage.md",
+                "Dual Dynamic Programming Algorithm" => "dual_dynamic_programming.md"
+                ],
+        ],
         "Policies" => "policies.md"
     ],
     "Methods" => "methods.md",
@@ -68,7 +87,7 @@ pages = OrderedDict(
     "Third Party Extensions" => "additional_third_party_extensions.md",
     "Model Inputs/Outputs Documentation" => "data_documentation.md",
     "GenX Inputs Functions" => "load_inputs.md",
-    "GenX Outputs Functions" => "write_outputs.md",
+    "GenX Outputs Functions" =>"write_outputs.md",
     #"Unit Testing (Under Development)" => "unit_testing.md"
 )
 makedocs(;
@@ -78,16 +97,25 @@ makedocs(;
     sitename="GenX",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://genxproject.github.io/GenX",
+        canonical="https://genxproject.github.io/GenX/stable",
         assets=String[],
     ),
     pages=[p for p in pages]
 )
 
 deploydocs(;
+    root = "<current-directory>",
+    dirname = "",
     repo="github.com/GenXProject/GenX.git",
     target = "build",
     branch = "gh-pages",
-    devbranch = "main",
-    push_preview = true,
+    devbranch = nothing, #"main",
+    devurl = "dev",
+    push_preview=true,
+    versions = ["stable" => "v^", "v#.#", devurl => devurl],
+    forcepush = false,
+    deploy_config = auto_detect_deploy_system(),
+    repo_previews = repo,
+    branch_previews = branch,
 )
+

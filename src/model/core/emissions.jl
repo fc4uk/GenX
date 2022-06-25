@@ -15,63 +15,28 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 @doc raw"""
-	emissions(EP::Model, inputs::Dict, UCommit::Int)
+	emissions(EP::Model, inputs::Dict)
 
 This function creates expression to add the CO2 emissions by plants in each zone, which is subsequently added to the total emissions
 """
-function emissions(EP::Model, inputs::Dict, setup::Dict)
+function emissions!(EP::Model, inputs::Dict)
 
-	println("Emissions Module (for CO2 Policy modularization")
+	# println("Emissions Module (for CO2 Policy modularization")
 
-	dfGen = inputs["dfGen"]
+	# dfGen = inputs["dfGen"]
 
-	G = inputs["G"]     # Number of resources (generators, storage, DR, and DERs)
-	T = inputs["T"]     # Number of time steps (hours)
-	Z = inputs["Z"]     # Number of zones
-	COMMIT = inputs["COMMIT"] # For not, thermal resources are the only ones eligible for Unit Committment
+	# G = inputs["G"]     # Number of resources (generators, storage, DR, and DERs)
+	# T = inputs["T"]     # Number of time steps (hours)
+	# Z = inputs["Z"]     # Number of zones
 
-	if setup["FLECCS"] >= 1
-	    gen_ccs = inputs["dfGen_ccs"]
-	    FLECCS_ALL = inputs["FLECCS_ALL"] # set of Fleccs generator
-	end
+	# @expression(EP, eEmissionsByPlant[y=1:G,t=1:T],
 
-	@expression(EP, eEmissionsByPlant[y=1:G,t=1:T],
-	 	if y in inputs["COMMIT"]
-			if setup["PieceWiseHeatRate"] ==1
-				(1 - dfGen[!,:CO2_Capture_Rate][y]) * (dfGen[!,:CO2_per_MMBTU][y]*EP[:vFuel][y,t] + dfGen[!,:CO2_per_Start][y]*EP[:vSTART][y,t])
-			else
-				dfGen[!,:CO2_per_MWh][y]*EP[:vP][y,t]+dfGen[!,:CO2_per_Start][y]*EP[:vSTART][y,t]
-			end
-	 	else
-		 	dfGen[!,:CO2_per_MWh][y]*EP[:vP][y,t]
-	 	end
- 	)
-	# right now, only plants with piecewise option need this function 03/25/2022
+	# 	if y in inputs["COMMIT"]
+	# 		dfGen[y,:CO2_per_MWh]*EP[:vP][y,t]+dfGen[y,:CO2_per_Start]*EP[:vSTART][y,t]
+	# 	else
+	# 		dfGen[y,:CO2_per_MWh]*EP[:vP][y,t]
+	# 	end
+	# )
+	# @expression(EP, eEmissionsByZone[z=1:Z, t=1:T], sum(eEmissionsByPlant[y,t] for y in dfGen[(dfGen[!,:Zone].==z),:R_ID]))
 
-	@expression(EP, eCO2SequestrationCost[y=1:G,t=1:T],
-	    if y in inputs["COMMIT"]
-		    if setup["PieceWiseHeatRate"] ==1
-				dfGen[!,:CO2_Sequestration_Cost][y]*dfGen[!,:CO2_Capture_Rate][y] * (dfGen[!,:CO2_per_MMBTU][y]*EP[:vFuel][y,t] + dfGen[!,:CO2_per_Start][y]*EP[:vSTART][y,t])
-		    	# CO2 sequestration by zone, 03/25/2022
-			end
-	    end
-    )
-
-
-    if setup["PieceWiseHeatRate"] ==1
-		@expression(EP, eCO2SequestrationByZone[z=1:Z, t=1:T], sum(eCO2SequestrationCost[y,t] for y in intersect(dfGen[(dfGen[!,:Zone].==z),:R_ID],COMMIT)))
-	end
-
-
-
-	# CO2 emissions from FLECCS 
-	if setup["FLECCS"] >= 1
-	    @expression(EP, eEmissionsByZone[z=1:Z, t=1:T], sum(eEmissionsByPlant[y,t] for y in dfGen[(dfGen[!,:Zone].==z),:R_ID]) + sum(EP[:eEmissionsByPlantFLECCS][y,t] for y in unique(gen_ccs[(gen_ccs[!,:Zone].==z),:R_ID])))
-	else
-		@expression(EP, eEmissionsByZone[z=1:Z, t=1:T], sum(eEmissionsByPlant[y,t] for y in dfGen[(dfGen[!,:Zone].==z),:R_ID]))
-	end
-
-
-
-	return EP
 end

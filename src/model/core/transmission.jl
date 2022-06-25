@@ -15,7 +15,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 @doc raw"""
-	function transmission(EP::Model, inputs::Dict, UCommit::Int, NetworkExpansion::Int, CapacityReserveMargin::Int)
+	function transmission!(EP::Model, inputs::Dict, setup::Dict)
 This function establishes decisions, expressions, and constraints related to transmission power flows between model zones and associated transmission losses (if modeled).
 The function adds transmission reinforcement or construction costs to the objective function. Transmission reinforcement costs are equal to the sum across all lines of the product between the transmission reinforcement/construction cost, $pi^{TCAP}_{l}$, times the additional transmission capacity variable, $\bigtriangleup\varphi^{max}_{l}$.
 ```math
@@ -108,16 +108,18 @@ As with losses option 2, this segment-wise approximation of a quadratic loss fun
 \end{aligned}
 ```
 """
-function transmission(EP::Model, inputs::Dict, UCommit::Int, NetworkExpansion::Int, CapacityReserveMargin::Int)
+function transmission!(EP::Model, inputs::Dict, setup::Dict)
 
 	println("Transmission Module")
-
-	dfGen = inputs["dfGen"]
 
 	T = inputs["T"]     # Number of time steps (hours)
 	Z = inputs["Z"]     # Number of zones
 	L = inputs["L"]     # Number of transmission lines
-	SEG = inputs["SEG"] # Number of load curtailment segments
+
+	UCommit = setup["UCommit"]
+	NetworkExpansion = setup["NetworkExpansion"]
+	CapacityReserveMargin = setup["CapacityReserveMargin"]
+	MultiStage = setup["MultiStage"]
 
 	## sets and indices for transmission losses and expansion
 	TRANS_LOSS_SEGS = inputs["TRANS_LOSS_SEGS"] # Number of segments used in piecewise linear approximations quadratic loss functions - can only take values of TRANS_LOSS_SEGS =1, 2
@@ -125,10 +127,13 @@ function transmission(EP::Model, inputs::Dict, UCommit::Int, NetworkExpansion::I
 	if NetworkExpansion == 1
 		# Network lines and zones that are expandable have non-negative maximum reinforcement inputs
 		EXPANSION_LINES = inputs["EXPANSION_LINES"]
-		NO_EXPANSION_LINES = inputs["NO_EXPANSION_LINES"]
 	end
 
 	### Variables ###
+
+	if MultiStage == 1
+		@variable(EP, vTRANSMAX[l=1:L] >= 0)
+	end
 
 	# Power flow on each transmission line "l" at hour "t"
 	@variable(EP, vFLOW[l=1:L,t=1:T]);
@@ -165,32 +170,48 @@ function transmission(EP::Model, inputs::Dict, UCommit::Int, NetworkExpansion::I
 
 	### Expressions ###
 
+	if MultiStage == 1
+		@expression(EP, eTransMax[l=1:L], vTRANSMAX[l])
+	else
+		@expression(EP, eTransMax[l=1:L], inputs["pTrans_Max"][l])
+	end
+
 	## Transmission power flow and loss related expressions:
 	# Total availabile maximum transmission capacity is the sum of existing maximum transmission capacity plus new transmission capacity
 	if NetworkExpansion == 1
 		@expression(EP, eAvail_Trans_Cap[l=1:L],
 			if l in EXPANSION_LINES
-				inputs["pTrans_Max"][l] + vNEW_TRANS_CAP[l]
+				eTransMax[l] + vNEW_TRANS_CAP[l]
 			else
-				inputs["pTrans_Max"][l] + EP[:vZERO]
+				eTransMax[l] + EP[:vZERO]
 			end
 		)
 	else
-		@expression(EP, eAvail_Trans_Cap[l=1:L], inputs["pTrans_Max"][l] + EP[:vZERO])
+		@expression(EP, eAvail_Trans_Cap[l=1:L], eTransMax[l] + EP[:vZERO])
 	end
 
 	# Net power flow outgoing from zone "z" at hour "t" in MW
     	@expression(EP, eNet_Export_Flows[z=1:Z,t=1:T], sum(inputs["pNet_Map"][l,z] * vFLOW[l,t] for l=1:L))
 
 	# Losses from power flows into or out of zone "z" in MW
-    	@expression(EP, eLosses_By_Zone[z=1:Z,t=1:T], sum(abs(inputs["pNet_Map"][l,z]) * vTLOSS[l,t] for l in LOSS_LINES))
+    	@expression(EP, eTransLossByZone[z=1:Z,t=1:T], EP[:vZERO] + sum(abs(inputs["pNet_Map"][l,z]) * vTLOSS[l,t] for l in LOSS_LINES))
+		@expression(EP, eTransLossByZoneYear[z=1:Z], sum(inputs["omega"][t] * EP[:eTransLossByZone][z, t] for t = 1:T))
 
 	## Objective Function Expressions ##
 
 	if NetworkExpansion == 1
 		@expression(EP, eTotalCNetworkExp, sum(vNEW_TRANS_CAP[l]*inputs["pC_Line_Reinforcement"][l] for l in EXPANSION_LINES))
-		EP[:eObj] += eTotalCNetworkExp
-    	end
+
+		if MultiStage == 1
+			# OPEX multiplier to count multiple years between two model stages
+			# We divide by OPEXMULT since we are going to multiply the entire objective function by this term later,
+			# and we have already accounted for multiple years between stages for fixed costs.
+			# EP[:eObj] += (1/inputs["OPEXMULT"])*eTotalCNetworkExp
+			add_to_expression!(EP[:eObj], (1/inputs["OPEXMULT"]), EP[:eTotalCNetworkExp])
+		else
+			add_to_expression!(EP[:eObj], EP[:eTotalCNetworkExp])
+		end
+	end
 
 	## End Objective Function Expressions ##
 
@@ -199,20 +220,17 @@ function transmission(EP::Model, inputs::Dict, UCommit::Int, NetworkExpansion::I
 	@expression(EP, ePowerBalanceNetExportFlows[t=1:T, z=1:Z],
 		-eNet_Export_Flows[z,t])
 	@expression(EP, ePowerBalanceLossesByZone[t=1:T, z=1:Z],
-		-(1/2)*eLosses_By_Zone[z,t])
+		-0.5 * eTransLossByZone[z,t])
 
-	EP[:ePowerBalance] += ePowerBalanceLossesByZone
-	EP[:ePowerBalance] += ePowerBalanceNetExportFlows
-
-	# Capacity Reserves Margin policy
-	if CapacityReserveMargin > 0
-		if Z > 1 
-			@expression(EP, eCapResMarBalanceTrans[res=1:inputs["NCapacityReserveMargin"], t=1:T], sum(inputs["dfTransCapRes_excl"][l,res] * inputs["dfDerateTransCapRes"][l,res]* EP[:vFLOW][l,t] for l in 1:L))
-			EP[:eCapResMarBalance] -= eCapResMarBalanceTrans
-		end
-	end
+	add_to_expression!.(EP[:ePowerBalance], EP[:ePowerBalanceLossesByZone])
+	add_to_expression!.(EP[:ePowerBalance], EP[:ePowerBalanceNetExportFlows])
 
 	### Constraints ###
+
+	if MultiStage == 1
+		# Linking constraint for existing transmission capacity
+		@constraint(EP, cExistingTransCap[l=1:L], vTRANSMAX[l] == inputs["pTrans_Max"][l])
+	end
 
   	## Power flow and transmission (between zone) loss related constraints
 
@@ -226,7 +244,11 @@ function transmission(EP::Model, inputs::Dict, UCommit::Int, NetworkExpansion::I
 	# If network expansion is used:
 	if NetworkExpansion == 1
 		# Transmission network related power flow and capacity constraints
-		# Constrain maximum line capacity reinforcement for lines eligible for expansion
+		if MultiStage == 1 
+			# Constrain maximum possible flow for lines eligible for expansion regardless of previous expansions
+			@constraint(EP, cMaxFlowPossible[l in EXPANSION_LINES], eAvail_Trans_Cap[l] <= inputs["pTrans_Max_Possible"][l])
+		end
+		# Constrain maximum single-stage line capacity reinforcement for lines eligible for expansion
 		@constraint(EP, cMaxLineReinforcement[l in EXPANSION_LINES], vNEW_TRANS_CAP[l] <= inputs["pMax_Line_Reinforcement"][l])
 	end
 	#END network expansion contraints
@@ -313,5 +335,4 @@ function transmission(EP::Model, inputs::Dict, UCommit::Int, NetworkExpansion::I
 		end
 	end # End if(TRANS_LOSS_SEGS > 0) block
 
-	return EP
 end

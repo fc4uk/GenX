@@ -27,14 +27,12 @@ returns: Dict (dictionary) object containing all data inputs
 """
 function load_inputs(setup::Dict,path::AbstractString)
 
-	data_directory = chop(replace(path, pwd() => ""), head = 1, tail = 0)
-
 	## Read input files
 	println("Reading Input CSV Files")
 	## Declare Dict (dictionary) object used to store parameters
 	inputs = Dict()
 	# Read input data about power network topology, operating and expansion attributes
-    if isfile(joinpath(path,"Network.csv"))
+	if isfile(joinpath(path,"Network.csv"))
 		inputs, network_var = load_network_data(setup, path, inputs)
 	else
 		inputs["Z"] = 1
@@ -63,15 +61,45 @@ function load_inputs(setup::Dict,path::AbstractString)
 	end
 
 	if setup["MinCapReq"] == 1
-		inputs = load_minimum_capacity_requirement(path, inputs, setup)
+		inputs = load_minimum_capacity_requirement(setup, path, inputs)
+	end
+
+	if setup["MaxCapReq"] == 1
+		inputs = load_maximum_capacity_limit(setup, path, inputs)
 	end
 
 	if setup["EnergyShareRequirement"]==1
 		inputs = load_energy_share_requirement(setup, path, inputs)
 	end
 
-	if setup["CO2Cap"] >= 1
+	if setup["CO2Cap"] == 1
 		inputs = load_co2_cap(setup, path, inputs)
+	end
+	if setup["CO2LoadRateCap"] == 1
+		inputs = load_co2_load_side_emission_rate_cap(setup, path, inputs)
+	end
+	if setup["CO2GenRateCap"] == 1
+		inputs = load_co2_generation_side_emission_rate_cap(setup, path, inputs)
+	end
+	if setup["CO2Tax"] == 1
+		inputs = load_co2_tax(setup, path, inputs)
+	end
+	if setup["CO2Capture"] ==1
+		if setup["CO2Credit"] == 1
+			inputs = load_co2_credit(setup, path, inputs)
+		end
+	end
+
+	if setup["TFS"] == 1
+		inputs = load_twentyfourseven(setup, path, inputs)
+	end
+
+	if setup["EnergyCredit"] == 1
+		inputs = load_energy_credit(setup, path, inputs)
+	end
+
+	if setup["InvestmentCredit"] == 1
+		inputs = load_investment_credit(setup, path, inputs)
 	end
 
 	if setup["CO2Tax"] >= 1
@@ -79,7 +107,7 @@ function load_inputs(setup::Dict,path::AbstractString)
 	end
 
 	# Read in mapping of modeled periods to representative periods
-	if setup["OperationWrapping"]==1 && !isempty(inputs["STOR_LONG_DURATION"]) && (isfile(data_directory*"/Period_map.csv") || isfile(joinpath(data_directory,joinpath(setup["TimeDomainReductionFolder"],"Period_map.csv")))) # Use Time Domain Reduced data for GenX)
+	if is_period_map_necessary(setup, path, inputs) && is_period_map_exist(setup, path, inputs)
 		inputs = load_period_map(setup, path, inputs)
 	end
 
@@ -90,4 +118,17 @@ function load_inputs(setup::Dict,path::AbstractString)
 	println("CSV Files Successfully Read In From $path")
 
 	return inputs
+end
+
+function is_period_map_necessary(setup::Dict, path::AbstractString, inputs::Dict)
+	ow = setup["OperationWrapping"]==1
+	has_stor_lds = !isempty(inputs["STOR_LONG_DURATION"])
+	ow && has_stor_lds
+end
+
+function is_period_map_exist(setup::Dict, path::AbstractString, inputs::Dict)
+	data_directory = chop(replace(path, pwd() => ""), head = 1, tail = 0)
+	is_here = isfile(joinpath(data_directory,"Period_map.csv"))
+	is_in_folder = isfile(joinpath(data_directory, setup["TimeDomainReductionFolder"], "Period_map.csv"))
+	is_here || is_in_folder
 end

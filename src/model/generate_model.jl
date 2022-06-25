@@ -104,119 +104,124 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 
 	# Initialize Power Balance Expression
 	# Expression for "baseline" power balance constraint
-	@expression(EP, ePowerBalance[t=1:T, z=1:Z], 0)
-
+	# note that the coefficient 1 is to making sure this expression is an expression, rather than a variable
+	@expression(EP, ePowerBalance[t=1:T, z=1:Z], 1*EP[:vZERO])
+	
 	# Initialize Objective Function Expression
-	@expression(EP, eObj, 0)
-
-	# Initialize Capacity Reserve Margin Expression
-	if setup["CapacityReserveMargin"] > 0
-		@expression(EP, eCapResMarBalance[res=1:inputs["NCapacityReserveMargin"], t=1:T], 0)
-	end
-
-	# Energy Share Requirement
-	if setup["EnergyShareRequirement"] >= 1
-		@expression(EP, eESR[ESR=1:inputs["nESR"]], 0)
-	end
-
-	if (setup["MinCapReq"] == 1)
-		@expression(EP, eMinCapRes[mincap = 1:inputs["NumberOfMinCapReqs"]], 0)
-	end
-
-	#@expression(EP, :eCO2Cap[cap=1:inputs["NCO2Cap"]], 0)
-	@expression(EP, eGenerationByZone[z=1:Z, t=1:T], 0)
+	# note that the coefficient 1 is to making sure this expression is an expression, rather than a variable
+	@expression(EP, eObj, 1*EP[:vZERO])
 
 	# Infrastructure
-	EP = discharge(EP, inputs, setup["EnergyShareRequirement"], setup["PieceWiseHeatRate"])
+	discharge!(EP, inputs, setup)
 
+	non_served_energy!(EP, inputs, setup)
 
-	EP = non_served_energy(EP, inputs, setup["CapacityReserveMargin"])
-
-	EP = investment_discharge(EP, inputs, setup["MinCapReq"])
+	investment_discharge!(EP, inputs, setup)
 
 	if setup["UCommit"] > 0
-		EP = ucommit(EP, inputs, setup["UCommit"])
+		ucommit!(EP, inputs, setup)
 	end
-
-	#EP = emissions(EP, inputs, setup) I need to move emissions module after the FLECCS module, otherwise, the emissions from FLECCS cannot be accounted, move it to line 195, FC, 1/25/2022
+	fuel!(EP, inputs, setup)
+	co2!(EP, inputs, setup)
 
 	if setup["Reserves"] > 0
-		EP = reserves(EP, inputs, setup["UCommit"])
+		reserves!(EP, inputs, setup)
 	end
 
 	if Z > 1
-		EP = transmission(EP, inputs, setup["UCommit"], setup["NetworkExpansion"], setup["CapacityReserveMargin"])
+		transmission!(EP, inputs, setup)
 	end
 
 	# Technologies
 	# Model constraints, variables, expression related to dispatchable renewable resources
 
 	if !isempty(inputs["VRE"])
-		EP = curtailable_variable_renewable(EP, inputs, setup["Reserves"], setup["CapacityReserveMargin"])
+		curtailable_variable_renewable!(EP, inputs, setup)
 	end
 
 	# Model constraints, variables, expression related to non-dispatchable renewable resources
 	if !isempty(inputs["MUST_RUN"])
-		EP = must_run(EP, inputs, setup["CapacityReserveMargin"])
+		must_run!(EP, inputs, setup)
 	end
 
 	# Model constraints, variables, expression related to energy storage modeling
 	if !isempty(inputs["STOR_ALL"])
-		EP = storage(EP, inputs, setup["Reserves"], setup["OperationWrapping"], setup["EnergyShareRequirement"], setup["CapacityReserveMargin"], setup["StorageLosses"])
+		storage!(EP, inputs, setup)
 	end
 
 	# Model constraints, variables, expression related to reservoir hydropower resources
 	if !isempty(inputs["HYDRO_RES"])
-		EP = hydro_res(EP, inputs, setup["Reserves"], setup["CapacityReserveMargin"])
+		hydro_res!(EP, inputs, setup)
 	end
 
 	# Model constraints, variables, expression related to reservoir hydropower resources with long duration storage
 	if setup["OperationWrapping"] == 1 && !isempty(inputs["STOR_HYDRO_LONG_DURATION"])
-		EP = hydro_inter_period_linkage(EP, inputs)
+		hydro_inter_period_linkage!(EP, inputs)
 	end
 
 	# Model constraints, variables, expression related to demand flexibility resources
 	if !isempty(inputs["FLEX"])
-		EP = flexible_demand(EP, inputs, setup["CapacityReserveMargin"])
+		flexible_demand!(EP, inputs, setup)
 	end
 	# Model constraints, variables, expression related to thermal resource technologies
 	if !isempty(inputs["THERM_ALL"])
-		EP = thermal(EP, inputs, setup["UCommit"], setup["Reserves"], setup["CapacityReserveMargin"],setup["PieceWiseHeatRate"])
-	end
-
-	if !isempty(inputs["DAC"])
-		EP = dac(EP, inputs)
-	end
-
-	# Model constraints, variables, expression related to fleccs
-	if (setup["FLECCS"] >= 1)
-		EP = fleccs(EP, inputs,  setup["FLECCS"], setup["UCommit"],  setup["CapacityReserveMargin"], setup["MinCapReq"])
+		thermal!(EP, inputs, setup)
 	end
 
 	# Policies
 	# CO2 emissions limits
-	EP = co2_cap(EP, inputs, setup)
-
-	EP = emissions(EP, inputs, setup) 
-
-	#CO2 tax module, penalize CO2 emissions, this need to be added in order to assess how CO2 tax affect the results. FC 1/25/2022
-	if setup["CO2Tax"] == 1
-		EP = co2_tax(EP, inputs, setup)
+	if setup["CO2Cap"] == 1
+		co2_cap!(EP, inputs, setup)
 	end
-
+	if setup["CO2LoadRateCap"] == 1
+		co2_load_side_emission_rate_cap!(EP, inputs, setup)
+	end
+	if setup["CO2GenRateCap"] == 1
+		co2_generation_side_emission_rate_cap!(EP, inputs, setup)
+	end
+	# CO2 Tax
+	if setup["CO2Tax"] == 1
+		co2_tax!(EP, inputs, setup)
+	end
+	# CO2 Capture Credit
+	if setup["CO2Capture"] == 1
+		if setup["CO2Credit"] == 1
+			co2_credit!(EP, inputs, setup)
+		end
+	end
+	# Endogenous Retirements
+	if setup["MultiStage"] > 0
+		endogenous_retirement!(EP, inputs, setup)
+	end
 
 	# Energy Share Requirement
 	if setup["EnergyShareRequirement"] >= 1
-		EP = energy_share_requirement(EP, inputs, setup)
+		energy_share_requirement!(EP, inputs, setup)
 	end
 
 	#Capacity Reserve Margin
 	if setup["CapacityReserveMargin"] > 0
-		EP = cap_reserve_margin(EP, inputs, setup)
+		cap_reserve_margin!(EP, inputs, setup)
 	end
 
 	if (setup["MinCapReq"] == 1)
-		EP = minimum_capacity_requirement(EP, inputs, setup)
+		minimum_capacity_requirement!(EP, inputs, setup)
+	end
+
+	if (setup["MaxCapReq"] == 1)
+		maximum_capacity_limit!(EP, inputs, setup)
+	end
+
+	if setup["TFS"] == 1
+		twentyfourseven!(EP, inputs, setup)
+	end
+
+	if setup["EnergyCredit"] == 1
+		energy_credit!(EP, inputs, setup)
+	end
+
+	if setup["InvestmentCredit"] == 1
+		investment_credit!(EP, inputs, setup)
 	end
 
 	## Define the objective function
