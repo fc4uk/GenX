@@ -101,8 +101,7 @@ function fleccs_no_commit(EP::Model, inputs::Dict)
 
 
 	### Minimum and maximum power output constraints (Constraints #3-4)
-	@constraints(EP,
-		[y in FLECCS_ALL,i in NO_COMMIT_ccs, t=1:T], EP[:vFLECCS_output][y,i,t] <= EP[:eTotalCapFLECCS][y,i])
-
+	@constraint(EP, [y in FLECCS_ALL,i in NO_COMMIT_ccs, t=1:T], EP[:vFLECCS_output][y,i,t] <= EP[:eTotalCapFLECCS][y,i])
+	
 	return EP
 end

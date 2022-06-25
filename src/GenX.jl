@@ -50,7 +50,7 @@ using DelimitedFiles
 
 # Uncomment if Gurobi or CPLEX active license and installations are there and the user intends to use either of them
 using Gurobi
-#using CPLEX
+using CPLEX
 #using MOI
 #using SCIP
 #using BenchmarkTools
