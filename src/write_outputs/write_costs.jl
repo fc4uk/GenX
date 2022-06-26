@@ -104,6 +104,15 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		dfCost[10,2] += value(EP[:eCTotalCOSlack])
 	end
 
+	if setup["FLECCS"] >= 1
+		dfCost[2,2] += (value(EP[:eTotalCInvFLECCS]) + value(EP[:eTotalCTXFLECCS]))
+		dfCost[3,2] += value(EP[:eTotalCFOMFLECCS])
+		dfCost[4,2] += value(EP[:eTotalCFuelFLECCS])
+		dfCost[5,2] += value(EP[:eTotalCVOMFLECCS])
+		dfCost[7,2] += value(EP[:eTotalCStartFLECCS])
+	end
+
+
 	if setup["ParameterScale"] == 1
 		dfCost.Total *= ModelScalingFactor^2
 	end
@@ -164,6 +173,14 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 
 	# NSE Cost
 	tempzonalcost[7, :] += vec(value.(EP[:eZonalCNSE]))
+
+	if setup["FLECCS"] >= 1
+		tempzonalcost[2,2] += (value(EP[:eZonalCInvFLECCS]) + value(EP[:eZonalCTXFLECCS]))
+		tempzonalcost[3,2] += value(EP[:eZonalCFOMFLECCS])
+		tempzonalcost[4,2] += value(EP[:eZonalCFuelFLECCS])
+		tempzonalcost[5,2] += value(EP[:eZonalCVOMFLECCS])
+		tempzonalcost[7,2] += value(EP[:eTotalCStartFLECCS])
+	end
 
 	# Sum of the total
 	tempzonalcost[1, :] = vec(sum(tempzonalcost[2:end, :], dims = 1))

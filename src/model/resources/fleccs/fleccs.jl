@@ -85,25 +85,22 @@ function fleccs(EP::Model, inputs::Dict,  FLECCS::Int, UCommit::Int, CapacityRes
 
 	# CO2 from start up fuel
 	@expression(EP, eEmissionsByFLECCS_start[y in FLECCS_ALL, i in inputs["COMMIT_CCS"], t=1:T],
-	    	sum( inputs["CO2_per_Start_FLECCS"][y,i]*EP[:vSTART_FLECCS][y,i,t] for i in inputs["COMMIT_CCS"]))
+	    	sum(inputs["CO2_per_Start_FLECCS"][y,i]*EP[:vSTART_FLECCS][y,i,t] for i in inputs["COMMIT_CCS"]))
 
 	# Add CO2 from start up fuel and vented CO2
 	if FLECCS ==7
-		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+0.044*EP[:eCO2_vent][y,t] - 0.044*EP[:vCO2_atmosphere][y,t])
+		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], inputs["omega"][t]*sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+0.044*EP[:eCO2_vent][y,t] - 0.044*EP[:vCO2_atmosphere][y,t])
 	else
-		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+EP[:eCO2_vent][y,t])
+		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], inputs["omega"][t]*sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+EP[:eCO2_vent][y,t])
     end
 
 	# Capacity Reserves Margin policy
-	if CapacityReserveMargin == 1
-		@expression(EP, eCapResMarBalanceFLECCS[res=1:inputs["NCapacityReserveMargin"], t=1:T], sum(dfGen_ccs[y,Symbol("CapRes_$res")] * (EP[:eCCS_net][y,t])  for y in FLECCS_ALL))
-		EP[:eCapResMarBalance] += eCapResMarBalanceFLECCS
-	end
 
-    if (MinCapReq == 1)
-        @expression(EP, eMinCapResFLECCS[mincap = 1:inputs["NumberOfMinCapReqs"]], sum(EP[:eTotalCap_FLECCS] for y in dfGen_ccs[(dfGen_ccs[!,Symbol("MinCapTag_$mincap")].== 1) ,:][!,:R_ID]))
-		EP[:eMinCapRes] += eMinCapResFLECCS
-	end
+
+    #if (MinCapReq == 1)
+    #    @expression(EP, eMinCapResFLECCS[mincap = 1:inputs["NumberOfMinCapReqs"]], sum(EP[:eTotalCap_FLECCS] for y in dfGen_ccs[(dfGen_ccs[!,Symbol("MinCapTag_$mincap")].== 1) ,:][!,:R_ID]))
+	#	EP[:eMinCapRes] += eMinCapResFLECCS
+	#end
 
 	# substation and transmission, 03/18/2022
 
@@ -111,11 +108,13 @@ function fleccs(EP::Model, inputs::Dict,  FLECCS::Int, UCommit::Int, CapacityRes
 
 	@constraint(EP, [y in FLECCS_ALL, t = 1:T], EP[:eCCS_net][y,t] <= vCAP_FLECCS_tx[y])
 
-	@expression(EP, eC_FLECCS_tx[y in FLECCS_ALL], dfGen_ccs[!,:CAPEX_tx][1+n*(y-1)]  * vCAP_FLECCS_tx[y] )
-	
-	@expression(EP, eTotalCFLECCS_tx, sum( eC_FLECCS_tx[y] for y in FLECCS_ALL) )
+	@expression(EP, eCTXFLECCS[y in FLECCS_ALL], dfGen_ccs[!,:CAPEX_tx][1+n*(y-1)]  * vCAP_FLECCS_tx[y] )
 
-	EP[:eObj] += eTotalCFLECCS_tx
+	@expression(EP, eZonalCTXFLECCS[z=1:Z], sum(eCTXFLECCS[y] for y in unique(dfGen_ccs[(dfGen_ccs[!, :Zone].==z), :R_ID])))
+
+    @expression(EP, eTotalCTXFLECCS, sum(EP[:eZonalCTXFLECCS][z] for z in 1:Z))
+	
+	EP[:eObj] += eTotalCTXFLECCS
 
 	
 

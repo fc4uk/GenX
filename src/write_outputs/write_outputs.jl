@@ -290,6 +290,24 @@ function write_outputs(EP::Model, path::AbstractString, setup::Dict, inputs::Dic
 	println("Time elapsed for writing fuel consumption is")
 	println(elapsed_time_fuel_consumption)
 
+	if setup["FLECCS"] >= 1
+		dfCap_FLECCS = write_capacity_fleccs(path, inputs, setup, EP)
+		dfPower_FLECCS = write_power_fleccs(path, inputs, setup, EP)
+		dfEnergyRevenue_FLECCS = DataFrame()
+		if has_duals(EP) == 1
+			dfEnergyRevenue_FLECCS = write_energy_revenue_fleccs(path, inputs, setup, EP, dfPower_FLECCS, dfPrice)
+			#dfSubRevenue_FLECCS, dfRegSubRevenue_FLECCS = write_subsidy_revenue_fleccs(path, inputs, setup, dfCap, EP)
+		end
+
+	    dfResRevenue_FLECCS = DataFrame()
+	    if setup["CapacityReserveMargin"]==1 && has_duals(EP) == 1
+	    	dfResRevenue_FLECCS = write_reserve_margin_revenue_fleccs(path, inputs, setup, dfResMar, EP)
+    	end
+
+		write_net_revenue_fleccs(path, inputs, setup, EP, dfCap_FLECCS, dfResRevenue_FLECCS, dfPower_FLECCS, dfEnergyRevenue_FLECCS)
+
+    end
+
 	## Print confirmation
 	println("Wrote outputs to $path")
 

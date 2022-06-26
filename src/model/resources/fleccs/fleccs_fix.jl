@@ -79,20 +79,28 @@ function fleccs_fix(EP::Model, inputs::Dict,   UCommit::Int)
 	# Fixed costs for resource "y" = annuitized investment cost plus fixed O&M costs
 	# If resource is not eligible for new capacity, fixed costs are only O&M costs
 
-	@expression(EP, eCFixFLECCS[y in FLECCS_ALL,i in N_F],
-	    if i in NEW_CAP_ccs # Resources eligible for new capacity
-		    if i in COMMIT_ccs
-		    	dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Inv_Cost_per_Unityr][i] * dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Cap_Size][i] *vCAP_FLECCS[y,i] + dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Fixed_OM_Cost_per_Unityr][i] *eTotalCapFLECCS[y,i]
-	    	else
-	    		dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Inv_Cost_per_Unityr][i] * vCAP_FLECCS[y,i] + dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Fixed_OM_Cost_per_Unityr][i] *eTotalCapFLECCS[y,i]
-	    	end
+	@expression(EP, eCFOMFLECCS[y in FLECCS_ALL,i in N_F],
+		dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Fixed_OM_Cost_per_Unityr][i] * eTotalCapFLECCS[y,i])
+
+	@expression(EP, eCInvFLECCS[y in FLECCS_ALL,i in N_F],
+		if i in COMMIT_ccs
+		    dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Inv_Cost_per_Unityr][i] * dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Cap_Size][i] *vCAP_FLECCS[y,i] 
 	    else
-		    dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Fixed_OM_Cost_per_Unityr][i] * eTotalCapFLECCS[y,i]
+	    	dfGen_ccs[(dfGen_ccs[!,:R_ID].==y),:Inv_Cost_per_Unityr][i] * vCAP_FLECCS[y,i]
 	    end
-    )
+	)
 
+	@expression(EP, eCFixFLECCS[y in FLECCS_ALL,i in N_F],eCFOMFLECCS[y,i] + eCInvFLECCS[y,i])
+    # Sum individual resource contributions to fixed costs to get total fixed costs
 
-	@expression(EP, eTotalCFixFLECCS, sum(eCFixFLECCS))
+	@expression(EP, eZonalCFOMFLECCS[z=1:Z], sum(EP[:eCFOMFLECCS][y,i] for i in  N_F, y in unique(dfGen_ccs[(dfGen_ccs[!, :Zone].==z), :R_ID])))
+    @expression(EP, eZonalCInvFLECCS[z=1:Z], sum(EP[:eCInvFLECCS][y,i] for i in  N_F, y in unique(dfGen_ccs[(dfGen_ccs[!, :Zone].==z), :R_ID])))
+    @expression(EP, eZonalCFixFLECCS[z=1:Z], sum(EP[:eCFixFLECCS][y,i] for i in  N_F, y in unique(dfGen_ccs[(dfGen_ccs[!, :Zone].==z), :R_ID])))
+
+    @expression(EP, eTotalCFOMFLECCS, sum(EP[:eZonalCFOMFLECCS][z] for z in 1:Z))
+    @expression(EP, eTotalCInvFLECCS, sum(EP[:eZonalCInvFLECCS][z] for z in 1:Z))
+    @expression(EP, eTotalCFixFLECCS, sum(EP[:eZonalCFixFLECCS][z] for z in 1:Z))
+
 
 
 	EP[:eObj] += eTotalCFixFLECCS

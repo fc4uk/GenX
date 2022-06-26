@@ -122,7 +122,7 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		ucommit!(EP, inputs, setup)
 	end
 	fuel!(EP, inputs, setup)
-	co2!(EP, inputs, setup)
+	#co2!(EP, inputs, setup)
 
 	if setup["Reserves"] > 0
 		reserves!(EP, inputs, setup)
@@ -168,6 +168,16 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		thermal!(EP, inputs, setup)
 	end
 
+	if !isempty(inputs["DAC"])
+		EP = dac(EP, inputs)
+	end
+
+	# Model constraints, variables, expression related to fleccs
+	if (setup["FLECCS"] >= 1)
+		EP = fleccs(EP, inputs,  setup["FLECCS"], setup["UCommit"],  setup["CapacityReserveMargin"], setup["MinCapReq"])
+	end
+    # move co2 module
+	co2!(EP, inputs, setup) 
 	# Policies
 	# CO2 emissions limits
 	if setup["CO2Cap"] == 1
@@ -223,6 +233,8 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 	if setup["InvestmentCredit"] == 1
 		investment_credit!(EP, inputs, setup)
 	end
+
+
 
 	## Define the objective function
 	@objective(EP,Min,EP[:eObj])

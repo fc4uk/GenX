@@ -98,6 +98,13 @@ function cap_reserve_margin!(EP::Model, inputs::Dict, setup::Dict)
 		add_to_expression!.(EP[:eCapResMarBalance], EP[:eCapResMarBalanceNSE])
 	end
 
+	if setup["FLECCS"] >= 1
+		dfGen_ccs = inputs["dfGen_ccs"]
+		FLECCS_ALL = inputs["FLECCS_ALL"]
+		@expression(EP, eCapResMarBalanceFLECCS[res=1:NCRM, t=1:T], sum(dfGen_ccs[y,Symbol("CapRes_$res")] * (EP[:eCCS_net][y,t])  for y in FLECCS_ALL))
+		add_to_expression!.(EP[:eCapResMarBalance], EP[:eCapResMarBalanceFLECCS])
+	end
+
 	# Transmission's contribution
 	if Z > 1 
 		@expression(EP, eCapResMarBalanceTrans[res=1:NCRM, t=1:T], sum(inputs["dfCapRes_network"][l, Symbol("DerateCapRes_$res")] * inputs["dfCapRes_network"][l, Symbol("CapRes_Excl_$res")] * EP[:vFLOW][l,t] for l in 1:L))
