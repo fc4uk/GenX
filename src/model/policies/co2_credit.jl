@@ -40,6 +40,17 @@ function co2_credit!(EP::Model, inputs::Dict, setup::Dict)
     @expression(EP, eTotalCCO2Credit, sum(eZonalCCO2Credit[z] for z in 1:Z))
     # add to objective function
 
+    if setup["FLECCS"] > 0
+        G_F = inputs["G_F"] # Number of FLECCS generator
+        dfGen_ccs = inputs["dfGen_ccs"]
+        @expression(EP, ePlantCCO2CreditFLECCS[y = 1:G_F], sum(EP[:eCO2CaptureByPlantFLECCS][y, t] for t in 1:T) * inputs["dfCO2Credit"][dfGen[y, :Zone], "CO2Credit"])
+        # Sum CO2 Credit to zonal level
+        @expression(EP, eZonalCCO2CreditFLECCS[z = 1:Z],  sum(EP[:ePlantCCO2CreditFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!, :Zone].==z), :R_ID])))
+        # Sum CO2 Credit to system level
+        @expression(EP, eTotalCCO2CreditFLECCS, sum(EP[:eZonalCCO2CreditFLECCS][z] for z in 1:Z))
+        add_to_expression!(EP[:eObj],  -1, EP[:eTotalCCO2CreditFLECCS])
+    end    
+
     add_to_expression!(EP[:eObj], -1, EP[:eTotalCCO2Credit])
 
 end

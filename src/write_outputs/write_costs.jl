@@ -110,6 +110,9 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		dfCost[4,2] += value(EP[:eTotalCFuelFLECCS])
 		dfCost[5,2] += value(EP[:eTotalCVOMFLECCS])
 		dfCost[7,2] += value(EP[:eTotalCStartFLECCS])
+		if setup["CO2Credit"] >= 1
+			dfCost[5,2] -= value(EP[:eTotalCCO2CreditFLECCS])
+		end
 	end
 
 
@@ -175,11 +178,14 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 	tempzonalcost[7, :] += vec(value.(EP[:eZonalCNSE]))
 
 	if setup["FLECCS"] >= 1
-		tempzonalcost[2,2] += (value(EP[:eZonalCInvFLECCS]) + value(EP[:eZonalCTXFLECCS]))
-		tempzonalcost[3,2] += value(EP[:eZonalCFOMFLECCS])
-		tempzonalcost[4,2] += value(EP[:eZonalCFuelFLECCS])
-		tempzonalcost[5,2] += value(EP[:eZonalCVOMFLECCS])
-		tempzonalcost[7,2] += value(EP[:eTotalCStartFLECCS])
+		tempzonalcost[2,:] += vec(value.(EP[:eZonalCInvFLECCS]) + value.(EP[:eZonalCTXFLECCS]))
+		tempzonalcost[3,:] += vec(value.(EP[:eZonalCFOMFLECCS]))
+		tempzonalcost[4,:] += vec(value.(EP[:eZonalCFuelFLECCS]))
+		tempzonalcost[5,:] += vec(value.(EP[:eZonalCVOMFLECCS]))
+		tempzonalcost[7,:] += vec(value.(EP[:eZonalCStartFLECCS]))
+		if setup["CO2Credit"] >= 1
+			tempzonalcost[5,:] -= value.(EP[:eZonalCCO2CreditFLECCS])
+		end
 	end
 
 	# Sum of the total

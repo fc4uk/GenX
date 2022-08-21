@@ -36,6 +36,17 @@ function co2_tax!(EP::Model, inputs::Dict, setup::Dict)
     # Sum CO2 Tax to system level
     @expression(EP, eTotalCCO2Tax, sum(EP[:eZonalCCO2Tax][z] for z in 1:Z))
 
+    if setup["FLECCS"] > 0
+        G_F = inputs["G_F"] # Number of FLECCS generator
+        dfGen_ccs = inputs["dfGen_ccs"]
+        @expression(EP, ePlantCCO2TaxFLECCS[y = 1:G_F], sum(EP[:eEmissionsByPlantFLECCS][y, t] for t in 1:T) * inputs["dfCO2Tax"][dfGen[y, :Zone], "CO2Tax"])
+        # Sum CO2 Tax to zonal level
+        @expression(EP, eZonalCCO2TaxFLECCS[z = 1:Z],  sum(EP[:ePlantCCO2TaxFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!, :Zone].==z), :R_ID])))
+        # Sum CO2 Tax to system level
+        @expression(EP, eTotalCCO2TaxFLECCS, sum(EP[:eZonalCCO2TaxFLECCS][z] for z in 1:Z))
+        add_to_expression!(EP[:eObj],  EP[:eTotalCCO2TaxFLECCS])
+    end    
+
     add_to_expression!(EP[:eObj], EP[:eTotalCCO2Tax])
 
 end

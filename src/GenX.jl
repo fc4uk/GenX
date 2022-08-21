@@ -57,8 +57,8 @@ using Statistics
 
 # Uncomment if Gurobi or CPLEX active license and installations are there and the user intends to use either of them
 # using CPLEX
-# using Gurobi
-#using CPLEX
+using Gurobi
+using CPLEX
 #using MOI
 #using SCIP
 using BenchmarkTools
@@ -104,6 +104,7 @@ include("load_inputs/load_twentyfourseven.jl")
 include("load_inputs/load_energy_credit.jl")
 include("load_inputs/load_investment_credit.jl")
 include("load_inputs/load_inputs.jl")
+include("load_inputs/load_fleccs_data.jl")
 
 include("time_domain_reduction/time_domain_reduction.jl")
 
@@ -141,6 +142,20 @@ include("model/resources/thermal/thermal.jl")
 include("model/resources/thermal/thermal_commit.jl")
 include("model/resources/thermal/thermal_no_commit.jl")
 # include("model/resources/thermal/piecewiseheatrate.jl")
+
+include("model/resources/dac/dac.jl")
+include("model/resources/fleccs/fleccs.jl")
+include("model/resources/fleccs/fleccs_fix.jl")
+include("model/resources/fleccs/fleccs1.jl")
+include("model/resources/fleccs/fleccs2.jl")
+include("model/resources/fleccs/fleccs3.jl")
+include("model/resources/fleccs/fleccs4.jl")
+include("model/resources/fleccs/fleccs5.jl")
+include("model/resources/fleccs/fleccs6.jl")
+include("model/resources/fleccs/fleccs7.jl")
+include("model/resources/fleccs/fleccs8.jl")
+include("model/resources/fleccs/fleccs_no_commit.jl")
+include("model/resources/fleccs/fleccs_commit.jl")
 
 include("model/policies/co2_cap.jl")
 include("model/policies/co2_load_emission_rate_cap.jl")
@@ -231,6 +246,11 @@ include("write_outputs/ucommit/write_commit.jl")
 include("write_outputs/ucommit/write_shutdown.jl")
 include("write_outputs/ucommit/write_start.jl")
 
+include("write_outputs/fleccs/write_capacity_fleccs.jl")
+include("write_outputs/fleccs/write_power_fleccs.jl")
+include("write_outputs/fleccs/write_energy_revenue_fleccs.jl")
+include("write_outputs/fleccs/write_reserve_margin_revenue_fleccs.jl")
+include("write_outputs/fleccs/write_net_revenue_fleccs.jl")
 
 include("write_outputs/write_outputs.jl")
 

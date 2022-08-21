@@ -27,26 +27,27 @@ function write_reserve_margin_revenue_fleccs(path::AbstractString, inputs::Dict,
 	FLECCS_ALL = inputs["FLECCS_ALL"]
 	j = inputs["BOP_id"]*FLECCS_ALL
 
-	dfResRevenue_FLECCS = DataFrame( Resource = dfGen_ccs[!,"Resource"][j],Zone = dfGen_ccs[!,:Zone][j], R_ID = dfGen_ccs[!,:R_ID][j], x1 = 0)
-	# initiation
+	dfResRevenue_FLECCS = DataFrame( Resource = dfGen_ccs[!,"Resource"][j],Zone = dfGen_ccs[!,:Zone][j], R_ID = dfGen_ccs[!,:R_ID][j], x1 = 0.00)
 
+	# initiation
 	for i in 1:inputs["NCapacityReserveMargin"]
 		# initiate the process by assuming everything is thermal
-
 		y = 1
-        dfResRevenue_FLECCS[y,:x1] = round.(Int, sum(value.(EP[:eCCS_net])[1,:] .*
-        DataFrame([[names(dfResMar)]; collect.(eachrow(dfResMar))], [:column; Symbol.(axes(dfResMar, 1))])[!,i+1] .* dfGen_ccs[1,Symbol("CapRes_$i")]))
-   
+		sym = Symbol("CapRes_$i")
+        #dfResRevenue_FLECCS[y,:x1] = round.(Int, sum(value.(EP[:eCCS_net])[1,:] .*
+        #DataFrame([[names(dfResMar)]; collect.(eachrow(dfResMar))], [:column; Symbol.(axes(dfResMar, 1))])[!,i+1] .* dfGen_ccs[1,Symbol("CapRes_$i")]))
+		dfResRevenue_FLECCS[y,:x1] += sum(dfGen_ccs[1,sym] .* (value.(EP[:eCCS_net])[1,:] .* (dual.(EP[:cCapacityResMargin][i, :]))))
 
 		if length(j) >1
 			for y in 2:length(j)
-				dfResRevenue_FLECCS[y,:x1] = round.(Int, sum(value.(EP[:eCCS_net])[y,:] .*
-				DataFrame([[names(dfResMar)]; collect.(eachrow(dfResMar))], [:column; Symbol.(axes(dfResMar, 1))])[!,i+1] .* dfGen_ccs[N*(y-1)+1,Symbol("CapRes_$i")]))
+				dfResRevenue_FLECCS[y,:x1]= sum(dfGen_ccs[1,sym] .* (value.(EP[:eCCS_net])[1,:] .* (dual.(EP[:cCapacityResMargin][i, :]))))
 			end
 		end
-
 		rename!(dfResRevenue_FLECCS, Dict(:x1 => Symbol("CapRes_$i")))
+
 	end
+
+
 	
 	dfResRevenue_FLECCS.AnnualSum = sum(eachcol(dfResRevenue_FLECCS[:,3:inputs["NCapacityReserveMargin"]+3]))
 
