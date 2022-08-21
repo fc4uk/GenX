@@ -56,7 +56,7 @@ function write_net_revenue_fleccs(path::AbstractString, inputs::Dict, setup::Dic
 	dfNetRevenueFLECCS.Fuel_cost = zeros(size(dfNetRevenueFLECCS, 1))
 	# right now we just have 1 fleccs technology in a single zone, leave it for simplicity
 	for i in 1:G_F
-		dfNetRevenueFLECCS.Fuel_cost[1+N*(i-1)] = value.(EP[:eCFuelFLECCS])[i]
+		dfNetRevenueFLECCS.Fuel_cost[1+N*(i-1)] = sum(getvalue.(EP[:eCVar_fuel])[i,:].* inputs["omega"])
 	end
 
 
@@ -68,36 +68,11 @@ function write_net_revenue_fleccs(path::AbstractString, inputs::Dict, setup::Dic
     #CAPEX_TX
 	dfNetRevenueFLECCS.CAPEX_tx = zeros(size(dfNetRevenueFLECCS, 1))
 	for i in 1:G_F
-		dfNetRevenueFLECCS.CAPEX_tx[inputs["BOP_id"]*FLECCS_ALL[i]] = sum(getvalue.(EP[:eTotalCTXFLECCS])[i])
+		dfNetRevenueFLECCS.CAPEX_tx[inputs["BOP_id"]*FLECCS_ALL[i]] = sum(getvalue.(EP[:eC_FLECCS_tx])[i])
 	end
 	if setup["ParameterScale"] == 1
 	    dfNetRevenueFLECCS.CAPEX_tx = dfNetRevenueFLECCS.CAPEX_tx * (ModelScalingFactor^2) # converting Million US$ to US$
 	end
-
-
-	# CO2 sequestration
-	dfNetRevenueFLECCS.CO2_sequestration = zeros(size(dfNetRevenueFLECCS, 1))
-	for i in 1:G_F
-		dfNetRevenueFLECCS.CO2_sequestration[inputs["BOP_id"]*FLECCS_ALL[i]] = sum(getvalue.(EP[:eCVar_CO2_sequestration]))
-	end
-
-	if setup["ParameterScale"] == 1
-	    dfNetRevenueFLECCS.CO2_sequestration = dfNetRevenueFLECCS.CO2_sequestration * (ModelScalingFactor^2) # converting Million US$ to US$
-	end
-
-	# CO2 Credit
-	dfNetRevenueFLECCS.CO2_credit = zeros(size(dfNetRevenueFLECCS, 1))
-	for i in 1:G_F
-		dfNetRevenueFLECCS.CO2_credit[inputs["BOP_id"]*FLECCS_ALL[i]] = sum(getvalue.(EP[:eZonalCCO2CreditFLECCS]))
-	end
-
-	if setup["ParameterScale"] == 1
-	    dfNetRevenueFLECCS.CO2_credit = dfNetRevenueFLECCS.CO2_credit * (ModelScalingFactor^2) # converting Million US$ to US$
-	end
-
-
-
-
 
 	# Add start-up cost to the dataframe
 	dfNetRevenueFLECCS.StartCost = zeros(size(dfNetRevenueFLECCS, 1))
@@ -152,8 +127,6 @@ function write_net_revenue_fleccs(path::AbstractString, inputs::Dict, setup::Dic
 	Fixed_OM_cost = sum(dfNetRevenueFLECCS[!,:Fixed_OM_cost]), Var_OM_cost = sum(dfNetRevenueFLECCS[!,:Var_OM_cost]),
 	Fuel_cost = sum(dfNetRevenueFLECCS[!,:Fuel_cost]),StartCost =sum(dfNetRevenueFLECCS[!,:StartCost]),
 	CAPEX_tx = sum(dfNetRevenueFLECCS[!,:CAPEX_tx]),
-	CO2_sequestration = sum(dfNetRevenueFLECCS[!,:CO2_sequestration]),
-	CO2_credit = sum(dfNetRevenueFLECCS[!,:CO2_credit]),
 	EnergyRevenue = sum(dfNetRevenueFLECCS[!,:EnergyRevenue]),ReserveMarginRevenue = sum(dfNetRevenueFLECCS[!,:ReserveMarginRevenue]),
 	EmissionsCost= sum(dfNetRevenueFLECCS[!,:EmissionsCost]))
 
@@ -162,8 +135,8 @@ function write_net_revenue_fleccs(path::AbstractString, inputs::Dict, setup::Dic
 
 
 
-	dfNetRevenueFLECCS2.Revenue =	dfNetRevenueFLECCS2.EnergyRevenue +  dfNetRevenueFLECCS2.ReserveMarginRevenue + dfNetRevenueFLECCS2.CO2_credit
-	dfNetRevenueFLECCS2.Cost =  dfNetRevenueFLECCS2.Inv_cost  + dfNetRevenueFLECCS2.Fixed_OM_cost + dfNetRevenueFLECCS2.Var_OM_cost + dfNetRevenueFLECCS2.Fuel_cost +  dfNetRevenueFLECCS2.EmissionsCost + dfNetRevenueFLECCS2.StartCost + dfNetRevenueFLECCS2.CAPEX_tx + dfNetRevenueFLECCS2.CO2_sequestration
+	dfNetRevenueFLECCS2.Revenue =	dfNetRevenueFLECCS2.EnergyRevenue +  dfNetRevenueFLECCS2.ReserveMarginRevenue
+	dfNetRevenueFLECCS2.Cost =  dfNetRevenueFLECCS2.Inv_cost  + dfNetRevenueFLECCS2.Fixed_OM_cost + dfNetRevenueFLECCS2.Var_OM_cost + dfNetRevenueFLECCS2.Fuel_cost +  dfNetRevenueFLECCS2.EmissionsCost + dfNetRevenueFLECCS2.StartCost + dfNetRevenueFLECCS2.CAPEX_tx
 	#dfNetRevenueFLECCS.Cost = dfNetRevenueFLECCS.Inv_cost+ dfNetRevenueFLECCS.Inv_cost_Unith + dfNetRevenueFLECCS.Fixed_OM_cost_per_Unityr + dfNetRevenueFLECCS.Fixed_OM_cost_per_Unityrh + dfNetRevenueFLECCS.Var_OM_Cost_per_Unit + dfNetRevenueFLECCS.Var_OM_cost_in + dfNetRevenueFLECCS.Fuel_cost + dfNetRevenueFLECCS.Charge_cost + dfNetRevenueFLECCS.EmissionsCost + dfNetRevenueFLECCS.StartCost
 	dfNetRevenueFLECCS2.Profit = 	dfNetRevenueFLECCS2.Revenue - dfNetRevenueFLECCS2.Cost
 
