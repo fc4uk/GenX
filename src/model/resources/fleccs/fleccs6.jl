@@ -15,11 +15,8 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 @doc raw"""
-	FLECCS2(EP::Model, inputs::Dict, UCommit::Int, Reserves::Int)
-
-The FLECCS2 module creates decision variables, expressions, and constraints related to NGCC-CCS coupled with solvent storage systems. In this module, we will write up all the constraints formulations associated with the power plant.
-
-This module uses the following 'helper' functions in separate files: FLECCS2_commit() for FLECCS subcompoents subject to unit commitment decisions and constraints (if any) and FLECCS2_no_commit() for FLECCS subcompoents not subject to unit commitment (if any).
+	FLECCS6(EP::Model, inputs::Dict, UCommit::Int, Reserves::Int)
+	FLECCS6, NGCC CCS + DAC (Gatech)
 """
 
 function fleccs6(EP::Model, inputs::Dict)
@@ -38,25 +35,13 @@ function fleccs6(EP::Model, inputs::Dict)
  
 
 
-	NEW_CAP_ccs = inputs["NEW_CAP_FLECCS"] #allow for new capcity build
-	RET_CAP_ccs = inputs["RET_CAP_FLECCS"] #allow for retirement
-
 	START_SUBPERIODS = inputs["START_SUBPERIODS"] #start
     INTERIOR_SUBPERIODS = inputs["INTERIOR_SUBPERIODS"] #interiors
-
     hours_per_subperiod = inputs["hours_per_subperiod"]
 
 	fuel_type = collect(skipmissing(dfGen_ccs[!,:Fuel]))
-
 	fuel_CO2 = inputs["fuel_CO2"]
 	fuel_costs = inputs["fuel_costs"]
-
-
-
-	STARTS = 1:inputs["H"]:T
-    # Then we record all time periods that do not begin a sub period
-    # (these will be subject to normal time couping constraints, looking back one period)
-    INTERIORS = setdiff(1:T,STARTS)
 
 
 	# variales related to power generation/consumption
@@ -199,45 +184,59 @@ function fleccs6(EP::Model, inputs::Dict)
 		[y in FLECCS_ALL, i in DAC1_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vCAPTURE_dac[y,t]
 		[y in FLECCS_ALL, i in DAC2_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vREGEN_dac[y,t]	
 		[y in FLECCS_ALL, i in DAC3_id, t =1:T],EP[:vFLECCS_output][y,i,t] == vSORBENT_fresh[y,t] * dfGen_ccs[!,:pCAPRatio_dac][1+n*(y-1)]
-		[y in FLECCS_ALL, i in BOP_id, t =1:T],EP[:vFLECCS_output][y,i,t] == eCCS_net[y,t]			
+		[y in FLECCS_ALL, i in BOP_id, t =1:T],EP[:vFLECCS_output][y,i,t] == eCCS_net[y,t] # gatech does not allow taking power from the grid		
 	end)
 
 	@constraint(EP, [y in FLECCS_ALL], EP[:eTotalCapFLECCS][y, BOP_id] == EP[:eTotalCapFLECCS][y, NGCT_id]+ EP[:eTotalCapFLECCS][y,NGST_id])
 
 
+    ########### amount of CO2 sequestration 
+	@expression(EP, eCO2_sequestration[y in FLECCS_ALL,t=1:T], eCO2_compressed[y,t])
 
 
 	########### variable cost ##################
-	#fuel cost
-	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T],(inputs["omega"][t]*fuel_costs[fuel_type[1]][t]*eFuel[y,t]))
+	#fuel
+	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T],(fuel_costs[fuel_type[1]][t]*eFuel[y,t]))
+	# Sum to annual level
+	@expression(EP, eCFuelFLECCS[y in FLECCS_ALL],inputs["omega"][t]*sum(eCVar_fuel[y,t] for t in 1:T))
+    # Sum to zonal-annual level
+	@expression(EP, eZonalCFuelFLECCS[z = 1:Z], (sum(EP[:eCFuelFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCFuelFLECCS, sum(eZonalCFuelFLECCS[z] for z in 1:Z))
 
+
+
+	#VOM
 	# CO2 sequestration cost applied to sequestrated CO2
-	@expression(EP, eCVar_CO2_sequestration[y in FLECCS_ALL, t = 1:T],(inputs["omega"][t]*eCO2_compressed[y,t]*dfGen_ccs[!,:pCO2_sequestration][1+n*(y-1)]))
-
-
-	# start variable O&M
+	@expression(EP, eCVar_CO2_sequestration[y in FLECCS_ALL, t = 1:T],inputs["omega"][t]*(eCO2_sequestration[y,t]*dfGen_ccs[!,:pCO2_sequestration][1+n*(y-1)]))
 	# variable O&M for ngcc
 	@expression(EP,eCVar_ngcc[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].==NGCT_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*vP_gt[y,t] +
 	(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].==NGST_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*ePower_st[y,t])
-	
 	 # variable O&M for compressor
 	@expression(EP,eCVar_comp[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Comp_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(eCO2_compressed[y,t]))
-
 	 # variable O&M for PCC
 	 @expression(EP,eCVar_pcc[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== PCC_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vCAPTURE_pcc[y,t]))
-
 	 # variable O&M for dac
 	 @expression(EP,eCVar_dac[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== DAC2_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vREGEN_dac[y,t]))
 
 
 	#adding up variable cost
 
-	@expression(EP,eVar_FLECCS[t = 1:T], sum(eCVar_fuel[y,t] + eCVar_CO2_sequestration[y,t] + eCVar_ngcc[y,t] + eCVar_comp[y,t] + eCVar_pcc[y,t]  + eCVar_dac[y,t]  for y in FLECCS_ALL))
+	@expression(EP, eCVOMFLECCS[y in FLECCS_ALL], sum(eCVar_CO2_sequestration[y,t] + eCVar_ngcc[y,t] + eCVar_comp[y,t] + eCVar_pcc[y,t]  + eCVar_dac[y,t]  for t in 1:T))
+    # Sum to zonal-annual level
+	@expression(EP, eZonalCVOMFLECCS[z = 1:Z], (sum(EP[:eCVOMFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCVOMFLECCS, sum(eZonalCVOMFLECCS[z] for z in 1:Z))
 
-	@expression(EP,eTotalCVar_FLECCS, sum(eVar_FLECCS[t] for t in 1:T))
+	# total variable cost 
+	@expression(EP, eCVarFLECCS[y in FLECCS_ALL],eCVOMFLECCS[y] + eCFuelFLECCS[y])
+	@expression(EP, eZonalCVarFLECCS[z = 1:Z],  sum(EP[:eCVarFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID])))
+    @expression(EP, eTotalCVarFLECCS, sum(EP[:eZonalCVarFLECCS][z] for z in 1:Z))
 
 
-	EP[:eObj] += eTotalCVar_FLECCS
+	# Add total variable discharging cost contribution to the objective function
+	EP[:eObj] += eTotalCVarFLECCS
+
 
 	return EP
 end

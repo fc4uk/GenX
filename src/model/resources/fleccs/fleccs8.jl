@@ -38,9 +38,6 @@ function fleccs8(EP::Model, inputs::Dict)
 
 
 
-	#NEW_CAP_ccs = inputs["NEW_CAP_FLECCS"] #allow for new capcity build
-	#RET_CAP_ccs = inputs["RET_CAP_FLECCS"] #allow for retirement
-
 	START_SUBPERIODS = inputs["START_SUBPERIODS"] #start
     INTERIOR_SUBPERIODS = inputs["INTERIOR_SUBPERIODS"] #interiors
 
@@ -51,14 +48,6 @@ function fleccs8(EP::Model, inputs::Dict)
 	fuel_CO2 = inputs["fuel_CO2"]
 	fuel_costs = inputs["fuel_costs"]
 
-
-
-	STARTS = 1:inputs["H"]:T
-    # Then we record all time periods that do not begin a sub period
-    # (these will be subject to normal time couping constraints, looking back one period)
-    INTERIORS = setdiff(1:T,STARTS)
-
-	# capacity decision variables
 
 
 	# variales related to power generation/consumption
@@ -97,6 +86,8 @@ function fleccs8(EP::Model, inputs::Dict)
     @expression(EP, eCO2_flue[y in FLECCS_ALL,t=1:T], inputs["CO2_per_MMBTU_FLECCS"][y,OXY_id] * eFuel[y,t])
     # CO2 vent
 	@expression(EP, eCO2_vent[y in FLECCS_ALL,t=1:T],(1-dfGen_ccs[!,:pCO2Cap][1+n*(y-1)])  *eCO2_flue[y,t])
+	# CO2 sequestration
+
 
 
 
@@ -133,34 +124,47 @@ function fleccs8(EP::Model, inputs::Dict)
 
 	@constraint(EP, [y in FLECCS_ALL], EP[:eTotalCapFLECCS][y, BOP_id] == EP[:eTotalCapFLECCS][y, OXY_id])
 
-
+    ########### amount of CO2 sequestration 
+	@expression(EP, eCO2_sequestration[y in FLECCS_ALL,t=1:T], eCO2_flue[y,t] - eCO2_vent[y,t])
 
 	###########variable cost
 	#fuel
-	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T],(inputs["omega"][t]*fuel_costs[fuel_type[1]][t]*eFuel[y,t]))
+	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T],(fuel_costs[fuel_type[1]][t]*eFuel[y,t]))
+	# Sum to annual level
+	@expression(EP, eCFuelFLECCS[y in FLECCS_ALL],inputs["omega"][t]*sum(eCVar_fuel[y,t] for t in 1:T))
+    # Sum to zonal-annual level
+	@expression(EP, eZonalCFuelFLECCS[z = 1:Z], (sum(EP[:eCFuelFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCFuelFLECCS, sum(eZonalCFuelFLECCS[z] for z in 1:Z))
 
+
+	# VOM
 	# CO2 sequestration cost applied to sequestrated CO2
-	@expression(EP, eCVar_CO2_sequestration[y in FLECCS_ALL, t = 1:T],(inputs["omega"][t]*eCO2_flue[y,t]*dfGen_ccs[!,:pCO2_sequestration][1+n*(y-1)]))
-
-
-	# start variable O&M
+	@expression(EP, eCVar_CO2_sequestration[y in FLECCS_ALL, t = 1:T],inputs["omega"][t]*(eCO2_sequestration[y,t]*dfGen_ccs[!,:pCO2_sequestration][1+n*(y-1)]))
 	# variable O&M for oxyfuel cycle
 	@expression(EP,eCVar_oxy[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].==OXY_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*vP_oxy[y,t])
 	# variable O&M for ASU
 	@expression(EP,eCVar_asu[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].==ASU_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*ePower_asu[y,t])
 	 # variable O&M for LOX
 	@expression(EP,eCVar_lox[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== LOX_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vSTORE_lox[y,t]))
+	
+	#FLECCS VOM
+	# Sum to annual level
+	@expression(EP, eCVOMFLECCS[y in FLECCS_ALL], sum((eCVar_CO2_sequestration[y,t] + eCVar_oxy[y,t] + eCVar_asu[y,t] + eCVar_lox[y,t]) for t in 1:T))
+	# Sum to zonal-annual level
+	@expression(EP, eZonalCVOMFLECCS[z = 1:Z], (sum(EP[:eCVOMFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCVOMFLECCS, sum(eZonalCVOMFLECCS[z] for z in 1:Z))
+
+	# total variable cost 
+	@expression(EP, eCVarFLECCS[y in FLECCS_ALL],eCVOMFLECCS[y] + eCFuelFLECCS[y])
+	#@expression(EP, eCVarFLECCS[y in FLECCS_ALL],inputs["omega"][t]*sum((eCVar_fuel[y,t] + eCVar_CO2_sequestration[y,t] + eCVar_oxy[y,t] + eCVar_asu[y,t] + eCVar_lox[y,t]) for t in 1:T))
+	@expression(EP, eZonalCVarFLECCS[z = 1:Z],  sum(EP[:eCVarFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID])))
+    @expression(EP, eTotalCVarFLECCS, sum(EP[:eZonalCVarFLECCS][z] for z in 1:Z))
 
 
-	#adding up variable cost
-
-	@expression(EP,eVar_FLECCS[t = 1:T], sum(eCVar_fuel[y,t] + eCVar_CO2_sequestration[y,t] + eCVar_oxy[y,t] + eCVar_asu[y,t] + eCVar_lox[y,t] for y in FLECCS_ALL))
-
-	@expression(EP,eTotalCVar_FLECCS, sum(eVar_FLECCS[t] for t in 1:T))
-
-
-	EP[:eObj] += eTotalCVar_FLECCS
-
+	# Add total variable discharging cost contribution to the objective function
+	EP[:eObj] += eTotalCVarFLECCS
 
 
 	return EP

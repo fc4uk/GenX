@@ -62,9 +62,6 @@ function fleccs_commit(EP::Model, inputs::Dict, UCommit::Int)
     @expression(EP, eTotalCStartFLECCS, sum(eZonalCStartFLECCS[z] for z in 1:Z))
 
 
-
-
-
 	EP[:eObj] +=  eTotalCStartFLECCS
 
 	### Constratints ###

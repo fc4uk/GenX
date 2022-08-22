@@ -87,8 +87,10 @@ function write_net_revenue_fleccs(path::AbstractString, inputs::Dict, setup::Dic
 
 	# CO2 Credit
 	dfNetRevenueFLECCS.CO2_credit = zeros(size(dfNetRevenueFLECCS, 1))
-	for i in 1:G_F
-		dfNetRevenueFLECCS.CO2_credit[inputs["BOP_id"]*FLECCS_ALL[i]] = sum(getvalue.(EP[:eZonalCCO2CreditFLECCS]))
+	if setup["CO2Credit"] == 1
+		for i in 1:G_F
+		    dfNetRevenueFLECCS.CO2_credit[inputs["BOP_id"]*FLECCS_ALL[i]] = sum(getvalue.(EP[:eZonalCCO2CreditFLECCS]))
+	    end
 	end
 
 	if setup["ParameterScale"] == 1

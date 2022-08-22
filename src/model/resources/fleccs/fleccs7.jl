@@ -160,11 +160,23 @@ function fleccs7(EP::Model, inputs::Dict)
 
 
 
+    ########### amount of CO2 sequestration 
+	@expression(EP, eCO2_sequestration[y in FLECCS_ALL,t=1:T], CO2_liquified[y,t])
 
-
+    ######################
 	# Cost
 	# Fuel: Cost of natural gas. inputs["omega"] should be added to all the variable cost related formulations
-	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*fuel_costs[fuel_type[1]][t] * (eFuel_use_calciner[y,t] + vFuel_use_NGCC[y,t]))
+	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T], fuel_costs[fuel_type[1]][t] * (eFuel_use_calciner[y,t] + vFuel_use_NGCC[y,t]))
+		# Sum to annual level
+	@expression(EP, eCFuelFLECCS[y in FLECCS_ALL],inputs["omega"][t]*sum(eCVar_fuel[y,t] for t in 1:T))
+    # Sum to zonal-annual level
+	@expression(EP, eZonalCFuelFLECCS[z = 1:Z], (sum(EP[:eCFuelFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCFuelFLECCS, sum(eZonalCFuelFLECCS[z] for z in 1:Z))
+
+
+	
+	
 	# Cost of feed CaCO3
 	@expression(EP, eCVar_CaCO3[y in FLECCS_ALL, t = 1:T],  inputs["omega"][t]*dfGen_ccs[!,:cost_limestone][1+n*(y-1)] * vCaCO3_use_calciner[y,t])
 	# Cost of limestone transport
@@ -175,12 +187,20 @@ function fleccs7(EP::Model, inputs::Dict)
 	@expression(EP, eCVar_CO2_sequestration[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*dfGen_ccs[!,:cost_seq][1+n*(y-1)] * CO2_liquified[y,t])
 
 	#adding up variable costs
-	@expression(EP,eVar_FLECCS[t = 1:T], sum(eCVar_fuel[y,t] + eCVar_CaCO3[y,t] +  eCVar_CaCO_transport[y,t] + eCVar_CO2_sequestration[y,t] for y in FLECCS_ALL))
-	@expression(EP,eTotalCVar_FLECCS, sum(eVar_FLECCS[t] for t in 1:T))
+	@expression(EP, eCVOMFLECCS[y in FLECCS_ALL], sum(eCVar_CaCO3[y,t] +  eCVar_CaCO_transport[y,t] + eCVar_CO2_sequestration[y,t] for t in 1:T))
+    # Sum to zonal-annual level
+	@expression(EP, eZonalCVOMFLECCS[z = 1:Z], (sum(EP[:eCVOMFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCVOMFLECCS, sum(eZonalCVOMFLECCS[z] for z in 1:Z))
 
-    #The fixed cost, c1 = 0.15 $M/MW/yr is combined with CAPEX_tx so you could see CAPEX_tx = 8382 + 150000 = 158382
+	# total variable cost 
+	@expression(EP, eCVarFLECCS[y in FLECCS_ALL],eCVOMFLECCS[y] + eCFuelFLECCS[y])
+	@expression(EP, eZonalCVarFLECCS[z = 1:Z],  sum(EP[:eCVarFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID])))
+    @expression(EP, eTotalCVarFLECCS, sum(EP[:eZonalCVarFLECCS][z] for z in 1:Z))
 
 
-	EP[:eObj] += eTotalCVar_FLECCS
+	# Add total variable discharging cost contribution to the objective function
+	EP[:eObj] += eTotalCVarFLECCS
+
 	return EP
 end

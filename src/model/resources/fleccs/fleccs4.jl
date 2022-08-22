@@ -17,9 +17,8 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 @doc raw"""
 	FLECCS3(EP::Model, inputs::Dict, UCommit::Int, Reserves::Int)
 
-The FLECCS3 module creates decision variables, expressions, and constraints related to NGCC-CCS coupled with thermal systems. In this module, we will write up all the constraints formulations associated with the power plant.
+The FLECCS3 module creates decision variables, expressions, and constraints related to NGCC-CCS coupled with thermal energy storage systems. In this module, we will write up all the constraints formulations associated with the power plant.
 
-This module uses the following 'helper' functions in separate files: FLECCS2_commit() for FLECCS subcompoents subject to unit commitment decisions and constraints (if any) and FLECCS2_no_commit() for FLECCS subcompoents not subject to unit commitment (if any).
 """
 
 function fleccs4(EP::Model, inputs::Dict)
@@ -31,33 +30,17 @@ function fleccs4(EP::Model, inputs::Dict)
     G_F = inputs["G_F"] # Number of FLECCS generator
 	FLECCS_ALL = inputs["FLECCS_ALL"] # set of FLECCS generator
 	dfGen_ccs = inputs["dfGen_ccs"] # FLECCS general data
-#	dfGen_ccs = inputs["dfGen_ccs"] # FLECCS specific parameters
-	# get number of flexible subcompoents
 	N_F = inputs["N_F"]
 	n = length(N_F)
 
 
-	#NEW_CAP_ccs = inputs["NEW_CAP_FLECCS"] #allow for new capcity build
-	#RET_CAP_ccs = inputs["RET_CAP_FLECCS"] #allow for retirement
-
 	START_SUBPERIODS = inputs["START_SUBPERIODS"] #start
     INTERIOR_SUBPERIODS = inputs["INTERIOR_SUBPERIODS"] #interiors
-
     hours_per_subperiod = inputs["hours_per_subperiod"]
 
 	fuel_type = collect(skipmissing(dfGen_ccs[!,:Fuel]))
-
 	fuel_CO2 = inputs["fuel_CO2"]
 	fuel_costs = inputs["fuel_costs"]
-
-
-
-	STARTS = 1:inputs["H"]:T
-    # Then we record all time periods that do not begin a sub period
-    # (these will be subject to normal time couping constraints, looking back one period)
-    INTERIORS = setdiff(1:T,STARTS)
-
-	# capacity decision variables
 
 
 	# variales related to power generation/consumption
@@ -71,8 +54,8 @@ function fleccs4(EP::Model, inputs::Dict)
         vCAPTURE[y in FLECCS_ALL,1:T] >= 0 # captured co2 at time t, tonne/h
         vSTORE_hot[y in FLECCS_ALL,1:T] >= 0 # energy stored in hot tank storage, MMBTU
         vSTORE_cold[y in FLECCS_ALL,1:T] >= 0 # energy stored in cold tank storage, MMBTU
-		vSTEAM_in[y in FLECCS_ALL,1:T] >= 0 # the energy content of steam that fed into the hot storage tank
-        vSTEAM_out[y in FLECCS_ALL,1:T] >= 0 # the energy content of steam that pump out of the hot storage tank
+		vSTEAM_in[y in FLECCS_ALL,1:T] >= 0 # the energy content of steam that fed into the hot storage tank, ,MMBTU/h
+        vSTEAM_out[y in FLECCS_ALL,1:T] >= 0 # the energy content of steam that pump out of the hot storage tank, MMBTU/h
 		vCOLD_in[y in FLECCS_ALL,1:T] >= 0 # the energy content of cold thermal energy that fed into the hot storage tank
         vCOLD_out[y in FLECCS_ALL,1:T] >= 0 # the energy content of cold thermal energy that pump out of the hot storage tank
 
@@ -135,7 +118,6 @@ function fleccs4(EP::Model, inputs::Dict)
 	@expression(EP, eSteam_mid_add[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:pSteamRate_mid_add][1+n*(y-1)]* eSteam_high_add[y,t])
 	# Additional low pressure steam, eqn 2g
 	@expression(EP, eSteam_low_add[y in FLECCS_ALL,t=1:T], dfGen_ccs[!,:pSteamRate_low_add][1+n*(y-1)] * eSteam_mid_add[y,t])
-
 
 
 
@@ -207,7 +189,7 @@ function fleccs4(EP::Model, inputs::Dict)
     # steam >0
 	@constraint(EP, [y in FLECCS_ALL,t=1:T], eSteam_mid[y,t] >= 0)
 
-	# steam——use——pcc >0
+	# steam_use_pcc >0
 	@constraint(EP, [y in FLECCS_ALL,t=1:T], eSteam_use_pcc[y,t] >= 0)
 
 	# cold energy constraint
@@ -234,46 +216,59 @@ function fleccs4(EP::Model, inputs::Dict)
 
 
 
+    ########### amount of CO2 sequestration 
+	@expression(EP, eCO2_sequestration[y in FLECCS_ALL,t=1:T], vCAPTURE[y,t])
+
+
 
 
 
 	###########variable cost
 	#fuel
-	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T],(inputs["omega"][t]*fuel_costs[fuel_type[1]][t]*(eFuel[y,t]+eFuel_add[y,t])))
+	@expression(EP, eCVar_fuel[y in FLECCS_ALL, t = 1:T],(fuel_costs[fuel_type[1]][t]*eFuel[y,t]))
+	# Sum to annual level
+	@expression(EP, eCFuelFLECCS[y in FLECCS_ALL],inputs["omega"][t]*sum(eCVar_fuel[y,t] for t in 1:T))
+    # Sum to zonal-annual level
+	@expression(EP, eZonalCFuelFLECCS[z = 1:Z], (sum(EP[:eCFuelFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCFuelFLECCS, sum(eZonalCFuelFLECCS[z] for z in 1:Z))
 
+
+    # VOM
 	# CO2 sequestration cost applied to sequestrated CO2
-	@expression(EP, eCVar_CO2_sequestration[y in FLECCS_ALL, t = 1:T],(inputs["omega"][t]*vCAPTURE[y,t]*dfGen_ccs[!,:pCO2_sequestration][1+n*(y-1)]))
-
-
-	# start variable O&M
+	@expression(EP, eCVar_CO2_sequestration[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(eCO2_sequestration[y,t]*dfGen_ccs[!,:pCO2_sequestration][1+n*(y-1)]))
 	# variable O&M for all the teams: combustion turbine (or oxfuel power cycle)
 	@expression(EP,eCVar_gt[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].==NGCT_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*vP_gt[y,t])
 	# variable O&M for NGCC-based teams: VOM of steam turbine and co2 compressor
 	# variable O&M for steam turbine
 	@expression(EP,eCVar_st[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].==NGST_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*ePower_st[y,t])
 	 # variable O&M for compressor
-	@expression(EP,eCVar_comp[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Comp_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(eCO2_flue[y,t] - eCO2_vent[y,t]))
-
-
-	# specfic variable O&M formulations for each team
+	@expression(EP,eCVar_comp[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Comp_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(eCO2_sequestration[y,t]))
 	# variable O&M for heat pump
 	@expression(EP,eCVar_heatpump[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== HeatPump_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(ePower_use_ts[y,t]))
-	# variable O&M for hot storage
+	# variable O&M for hot storage, protional to vSteam_in
 	@expression(EP,eCVar_hot[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Hot_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vSTEAM_in[y,t]))
-	# variable O&M for cold storage
+	# variable O&M for cold storage, protional to vCOLD_in
 	@expression(EP,eCVar_cold[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Cold_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vCOLD_in[y,t]))
 	# variable O&M for PCC
 	@expression(EP,eCVar_PCC[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== PCC_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vCAPTURE[y,t]))
 
 
 	#adding up variable cost
+	@expression(EP, eCVOMFLECCS[y in FLECCS_ALL], sum( eCVar_CO2_sequestration[y,t] + eCVar_gt[y,t] + eCVar_st[y,t] + eCVar_comp[y,t] + eCVar_PCC[y,t] +eCVar_heatpump[y,t] + eCVar_hot[y,t] + eCVar_cold[y,t] for t in 1:T))
+	# Sum to zonal-annual level
+	@expression(EP, eZonalCVOMFLECCS[z = 1:Z], (sum(EP[:eCVOMFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
+	# Sum to system level
+    @expression(EP, eTotalCVOMFLECCS, sum(eZonalCVOMFLECCS[z] for z in 1:Z))
 
-	@expression(EP,eVar_FLECCS[t = 1:T], sum(eCVar_fuel[y,t] + eCVar_CO2_sequestration[y,t] + eCVar_gt[y,t] + eCVar_st[y,t] + eCVar_comp[y,t] + eCVar_PCC[y,t] +eCVar_heatpump[y,t] + eCVar_hot[y,t] + eCVar_cold[y,t] for y in FLECCS_ALL))
+	# total variable cost 
+	@expression(EP, eCVarFLECCS[y in FLECCS_ALL],eCVOMFLECCS[y] + eCFuelFLECCS[y])
+	@expression(EP, eZonalCVarFLECCS[z = 1:Z],  sum(EP[:eCVarFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID])))
+    @expression(EP, eTotalCVarFLECCS, sum(EP[:eZonalCVarFLECCS][z] for z in 1:Z))
 
-	@expression(EP,eTotalCVar_FLECCS, sum(eVar_FLECCS[t] for t in 1:T))
 
-
-	EP[:eObj] += eTotalCVar_FLECCS
+	# Add total variable discharging cost contribution to the objective function
+	EP[:eObj] += eTotalCVarFLECCS
 
 
 

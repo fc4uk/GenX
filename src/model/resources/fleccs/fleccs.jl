@@ -88,10 +88,12 @@ function fleccs(EP::Model, inputs::Dict,  FLECCS::Int, UCommit::Int, CapacityRes
 	    	sum(inputs["CO2_per_Start_FLECCS"][y,i]*EP[:vSTART_FLECCS][y,i,t] for i in inputs["COMMIT_CCS"]))
 
 	# Add CO2 from start up fuel and vented CO2
+	
 	if FLECCS ==7
-		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], inputs["omega"][t]*sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+0.044*EP[:eCO2_vent][y,t] - 0.044*EP[:vCO2_atmosphere][y,t])
+		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], inputs["omega"][t]*(sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+0.044*EP[:eCO2_vent][y,t] - 0.044*EP[:vCO2_atmosphere][y,t]))
 	else
-		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], inputs["omega"][t]*sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+EP[:eCO2_vent][y,t])
+		@expression(EP, eEmissionsByPlantFLECCS[y in FLECCS_ALL, t=1:T], inputs["omega"][t]*(sum(eEmissionsByFLECCS_start[y,i,t] for i in inputs["COMMIT_CCS"])+EP[:eCO2_vent][y,t]))
+		@expression(EP, eCO2CaptureByPlantFLECCS[y in FLECCS_ALL, t=1:T], inputs["omega"][t]*EP[:eCO2_sequestration][y,t])
     end
 
 	# Capacity Reserves Margin policy
