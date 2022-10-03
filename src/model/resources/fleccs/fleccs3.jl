@@ -24,7 +24,7 @@ This module uses the following 'helper' functions in separate files: FLECCS2_com
 
 function fleccs3(EP::Model, inputs::Dict)
 
-	println("FLECCS2, NGCC coupled with solvent storage Resources Module - Aux boiler - 8 Rivers")
+	println("FLECCS3, NGCC coupled with solvent storage Resources Module - Aux boiler - 8 Rivers")
 
 	T = inputs["T"]     # Number of time steps (hours)
     Z = inputs["Z"]     # Number of zones
@@ -205,7 +205,7 @@ function fleccs3(EP::Model, inputs::Dict)
 	# variable O&M for steam turbine
 	@expression(EP,eCVar_st[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].==NGST_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*ePower_st[y,t])
 	 # variable O&M for compressor
-	#@expression(EP,eCVar_comp[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Comp_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(eCO2_sequestration[y,t]))
+	@expression(EP,eCVar_comp[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Comp_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(eCO2_sequestration[y,t]))
 	# variable O&M for rich solvent storage
 	#@expression(EP,eCVar_rich[y in FLECCS_ALL, t = 1:T], inputs["omega"][t]*(dfGen_ccs[(dfGen_ccs[!,:FLECCS_NO].== Rich_id) .& (dfGen_ccs[!,:R_ID].==y),:Var_OM_Cost_per_Unit][1])*(vSTORE_rich[y,t]))
 	# variable O&M for lean solvent storage
@@ -218,7 +218,7 @@ function fleccs3(EP::Model, inputs::Dict)
 
 	#adding up variable cost
 
-	@expression(EP, eCVOMFLECCS[y in FLECCS_ALL], sum(eCVar_CO2_sequestration[y,t] + eCVar_gt[y,t] + eCVar_st[y,t] + eCVar_comp[y,t] + eCVar_absorber[y,t] + eCVar_regen[y,t] + eCVar_rich[y,t] +eCVar_lean[y,t] for t in 1:T))
+	@expression(EP, eCVOMFLECCS[y in FLECCS_ALL], sum(eCVar_CO2_sequestration[y,t] + eCVar_gt[y,t] + eCVar_st[y,t] + eCVar_comp[y,t] + eCVar_absorber[y,t] + eCVar_regen[y,t] for t in 1:T))
     # Sum to zonal-annual level
 	@expression(EP, eZonalCVOMFLECCS[z = 1:Z], (sum(EP[:eCVOMFLECCS][y] for y in unique(dfGen_ccs[(dfGen_ccs[!,:Zone].==z),:R_ID]))))
 	# Sum to system level
