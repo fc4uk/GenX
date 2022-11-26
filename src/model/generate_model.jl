@@ -77,7 +77,7 @@ The power balance constraint of the model ensures that electricity demand is met
 
 """
 
-## generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAttributes,modeloutput = nothing)
+## generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAttributes)
 ################################################################################
 ##
 ## description: Sets up and solves constrained optimization model of electricity
@@ -87,7 +87,7 @@ The power balance constraint of the model ensures that electricity demand is met
 ## returns: Model EP object containing the entire optimization problem model to be solved by SolveModel.jl
 ##
 ################################################################################
-function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAttributes,modeloutput = nothing)
+function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAttributes)
 
 	T = inputs["T"]     # Number of time steps (hours)
 	Z = inputs["Z"]     # Number of zones
@@ -104,12 +104,27 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 
 	# Initialize Power Balance Expression
 	# Expression for "baseline" power balance constraint
-	# note that the coefficient 1 is to making sure this expression is an expression, rather than a variable
-	@expression(EP, ePowerBalance[t=1:T, z=1:Z], 1*EP[:vZERO])
-	
+	@expression(EP, ePowerBalance[t=1:T, z=1:Z], 0)
+
 	# Initialize Objective Function Expression
-	# note that the coefficient 1 is to making sure this expression is an expression, rather than a variable
-	@expression(EP, eObj, 1*EP[:vZERO])
+	@expression(EP, eObj, 0)
+
+
+	#@expression(EP, :eCO2Cap[cap=1:inputs["NCO2Cap"]], 0)
+	@expression(EP, eGenerationByZone[z=1:Z, t=1:T], 0)
+	# Initialize Capacity Reserve Margin Expression
+	if setup["CapacityReserveMargin"] > 0
+		@expression(EP, eCapResMarBalance[res=1:inputs["NCapacityReserveMargin"], t=1:T], 0)
+	end
+
+	# Energy Share Requirement
+	if setup["EnergyShareRequirement"] >= 1
+		@expression(EP, eESR[ESR=1:inputs["nESR"]], 0)
+	end
+
+	if (setup["MinCapReq"] == 1)
+		@expression(EP, eMinCapRes[mincap = 1:inputs["NumberOfMinCapReqs"]], 0)
+	end
 
 	# Infrastructure
 	discharge!(EP, inputs, setup)
@@ -121,8 +136,8 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 	if setup["UCommit"] > 0
 		ucommit!(EP, inputs, setup)
 	end
-	fuel!(EP, inputs, setup)
-	#co2!(EP, inputs, setup)
+
+	emissions!(EP, inputs)
 
 	if setup["Reserves"] > 0
 		reserves!(EP, inputs, setup)
@@ -168,37 +183,15 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		thermal!(EP, inputs, setup)
 	end
 
-	if !isempty(inputs["DAC"])
-		EP = dac(EP, inputs)
+	# Model constraints, variables, expression related to retrofit technologies
+	if !isempty(inputs["RETRO"])
+		EP = retrofit(EP, inputs)
 	end
 
-	# Model constraints, variables, expression related to fleccs
-	if (setup["FLECCS"] >= 1)
-		EP = fleccs(EP, inputs,  setup["FLECCS"], setup["UCommit"],  setup["CapacityReserveMargin"], setup["MinCapReq"])
-	end
-    # move co2 module
-	co2!(EP, inputs, setup) 
 	# Policies
 	# CO2 emissions limits
-	if setup["CO2Cap"] == 1
-		co2_cap!(EP, inputs, setup)
-	end
-	if setup["CO2LoadRateCap"] == 1
-		co2_load_side_emission_rate_cap!(EP, inputs, setup)
-	end
-	if setup["CO2GenRateCap"] == 1
-		co2_generation_side_emission_rate_cap!(EP, inputs, setup)
-	end
-	# CO2 Tax
-	if setup["CO2Tax"] == 1
-		co2_tax!(EP, inputs, setup)
-	end
-	# CO2 Capture Credit
-	if setup["CO2Capture"] == 1
-		if setup["CO2Credit"] == 1
-			co2_credit!(EP, inputs, setup)
-		end
-	end
+	co2_cap!(EP, inputs, setup)
+
 	# Endogenous Retirements
 	if setup["MultiStage"] > 0
 		endogenous_retirement!(EP, inputs, setup)
@@ -218,24 +211,6 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		minimum_capacity_requirement!(EP, inputs, setup)
 	end
 
-	if (setup["MaxCapReq"] == 1)
-		maximum_capacity_limit!(EP, inputs, setup)
-	end
-
-	if setup["TFS"] == 1
-		twentyfourseven!(EP, inputs, setup)
-	end
-
-	if setup["EnergyCredit"] == 1
-		energy_credit!(EP, inputs, setup)
-	end
-
-	if setup["InvestmentCredit"] == 1
-		investment_credit!(EP, inputs, setup)
-	end
-
-
-
 	## Define the objective function
 	@objective(EP,Min,EP[:eObj])
 
@@ -246,15 +221,9 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 
 	## Record pre-solver time
 	presolver_time = time() - presolver_start_time
-    	#### Question - What do we do with this time now that we've split this function into 2?
 	if setup["PrintModel"] == 1
-		if modeloutput === nothing
-			filepath = joinpath(pwd(), "YourModel.lp")
-			JuMP.write_to_file(EP, filepath)
-		else
-			filepath = joinpath(modeloutput, "YourModel.lp")
-			JuMP.write_to_file(EP, filepath)
-		end
+		filepath = joinpath(pwd(), "YourModel.lp")
+		JuMP.write_to_file(EP, filepath)
 		println("Model Printed")
     	end
 

@@ -56,10 +56,20 @@ function investment_discharge!(EP::Model, inputs::Dict, setup::Dict)
 	dfGen = inputs["dfGen"]
 
 	G = inputs["G"] # Number of resources (generators, storage, DR, and DERs)
-	Z = inputs["Z"]
+
 	NEW_CAP = inputs["NEW_CAP"] # Set of all resources eligible for new capacity
 	RET_CAP = inputs["RET_CAP"] # Set of all resources eligible for capacity retirements
 	COMMIT = inputs["COMMIT"] # Set of all resources eligible for unit commitment
+	RETRO = inputs["RETRO"]     # Set of all retrofit resources
+
+	# Additional retrofit information if necessary
+	if !isempty(RETRO)
+		NUM_RETRO_SOURCES = inputs["NUM_RETROFIT_SOURCES"]       # The number of source resources for each retrofit resource
+		RETRO_SOURCES = inputs["RETROFIT_SOURCES"]               # Source technologies (Resource Name) for each retrofit [1:G]
+		RETRO_SOURCE_IDS = inputs["RETROFIT_SOURCE_IDS"]         # Source technologies (IDs) for each retrofit [1:G]
+		RETRO_INV_CAP_COSTS = inputs["RETROFIT_INV_CAP_COSTS"]   # The set of investment costs (capacity $/MWyr) of each retrofit by source
+		RETRO_EFFICIENCY = inputs["RETROFIT_EFFICIENCIES"]       # Ratio of installed retrofit capacity to retired source capacity [0:1]
+	end
 
 	### Variables ###
 
@@ -73,6 +83,14 @@ function investment_discharge!(EP::Model, inputs::Dict, setup::Dict)
 		@variable(EP, vEXISTINGCAP[y=1:G] >= 0);
 	end
 
+	# Capacity from source resource "yr" that is being retrofitted into capacity of retrofit resource "r"
+	if !isempty(RETRO)
+		# Dependent iterators only allowed in forward sequence, so we reconstruct retrofit destinations from sources.
+		ALL_SOURCES = intersect(collect(Set(collect(Iterators.flatten(RETRO_SOURCE_IDS)))),RET_CAP)
+		DESTS_BY_SOURCE = [ y in ALL_SOURCES ? intersect(findall(x->in(inputs["RESOURCES"][y],RETRO_SOURCES[x]), 1:G), findall(x->x in NEW_CAP, 1:G)) : []  for y in 1:G]
+		@variable(EP, vRETROFIT[yr in ALL_SOURCES, r in DESTS_BY_SOURCE[yr]] >= 0);     # Capacity retrofitted from source technology y to retrofit technology r
+	end
+
 	### Expressions ###
 
 	if MultiStage == 1
@@ -82,7 +100,7 @@ function investment_discharge!(EP::Model, inputs::Dict, setup::Dict)
 	end
 
 	# Cap_Size is set to 1 for all variables when unit UCommit == 0
-	# When UCommit > 0, Cap_Size is set to 1 for all variables except those where THERM == 1	
+	# When UCommit > 0, Cap_Size is set to 1 for all variables except those where THERM == 1
 	@expression(EP, eTotalCap[y in 1:G],
 		if y in intersect(NEW_CAP, RET_CAP) # Resources eligible for new capacity and retirements
 			if y in COMMIT
@@ -111,40 +129,35 @@ function investment_discharge!(EP::Model, inputs::Dict, setup::Dict)
 
 	# Fixed costs for resource "y" = annuitized investment cost plus fixed O&M costs
 	# If resource is not eligible for new capacity, fixed costs are only O&M costs
-	@expression(EP, eInvCap[y in 1:G],
-		if y in NEW_CAP # Resources eligible for new capacity
+	@expression(EP, eCFix[y in 1:G],
+		if y in setdiff(NEW_CAP, RETRO) # Resources eligible for new capacity (Non-Retrofit)
 			if y in COMMIT
-				dfGen[y, :Cap_Size] * vCAP[y]
+				dfGen[y,:Inv_Cost_per_MWyr]*dfGen[y,:Cap_Size]*vCAP[y] + dfGen[y,:Fixed_OM_Cost_per_MWyr]*eTotalCap[y]
 			else
-				vCAP[y]
+				dfGen[y,:Inv_Cost_per_MWyr]*vCAP[y] + dfGen[y,:Fixed_OM_Cost_per_MWyr]*eTotalCap[y]
+			end
+		elseif y in intersect(NEW_CAP, RETRO) # Resources eligible for new capacity (Retrofit yr -> y)
+			if y in COMMIT
+				sum( RETRO_SOURCE_IDS[y][i] in RET_CAP ? RETRO_INV_CAP_COSTS[y][i]*dfGen[y,:Cap_Size]*vRETROFIT[RETRO_SOURCE_IDS[y][i],y]*RETRO_EFFICIENCY[y][i] : 0 for i in 1:NUM_RETRO_SOURCES[y]) + dfGen[y,:Fixed_OM_Cost_per_MWyr]*eTotalCap[y]
+			else
+				sum( RETRO_SOURCE_IDS[y][i] in RET_CAP ? RETRO_INV_CAP_COSTS[y][i]*vRETROFIT[RETRO_SOURCE_IDS[y][i],y]*RETRO_EFFICIENCY[y][i] : 0 for i in 1:NUM_RETRO_SOURCES[y]) + dfGen[y,:Fixed_OM_Cost_per_MWyr]*eTotalCap[y]
 			end
 		else
-			EP[:vZERO]
-		end	
+			dfGen[y,:Fixed_OM_Cost_per_MWyr]*eTotalCap[y]
+		end
 	)
-    @expression(EP, eCInvCap[y in 1:G], dfGen[y, :Inv_Cost_per_MWyr] * EP[:eInvCap][y])
-    @expression(EP, eCFOMCap[y in 1:G], dfGen[y, :Fixed_OM_Cost_per_MWyr] * EP[:eTotalCap][y])
-    @expression(EP, eCFix[y in 1:G], EP[:eCInvCap][y] + EP[:eCFOMCap][y])
 
-    # Sum individual resource contributions to fixed costs to get total fixed costs
-
-    @expression(EP, eZonalCFOM[z=1:Z], EP[:vZERO] + sum(EP[:eCFOMCap][y] for y in dfGen[(dfGen[!, :Zone].==z), :R_ID]))
-    @expression(EP, eZonalCInv[z=1:Z], EP[:vZERO] + sum(EP[:eCInvCap][y] for y in dfGen[(dfGen[!, :Zone].==z), :R_ID]))
-    @expression(EP, eZonalCFix[z=1:Z], EP[:vZERO] + sum(EP[:eCFix][y] for y in dfGen[(dfGen[!, :Zone].==z), :R_ID]))
-
-    @expression(EP, eTotalCFOM, sum(EP[:eZonalCFOM][z] for z in 1:Z))
-    @expression(EP, eTotalCInv, sum(EP[:eZonalCInv][z] for z in 1:Z))
-    @expression(EP, eTotalCFix, sum(EP[:eZonalCFix][z] for z in 1:Z))
+	# Sum individual resource contributions to fixed costs to get total fixed costs
+	@expression(EP, eTotalCFix, sum(EP[:eCFix][y] for y in 1:G))
 
 	# Add term to objective function expression
 	if MultiStage == 1
 		# OPEX multiplier scales fixed costs to account for multiple years between two model stages
 		# We divide by OPEXMULT since we are going to multiply the entire objective function by this term later,
 		# and we have already accounted for multiple years between stages for fixed costs.
-		# EP[:eObj] += (1/inputs["OPEXMULT"])*eTotalCFix
-		add_to_expression!(EP[:eObj], (1/inputs["OPEXMULT"]), EP[:eTotalCFix])
+		EP[:eObj] += (1/inputs["OPEXMULT"])*eTotalCFix
 	else
-		add_to_expression!(EP[:eObj], EP[:eTotalCFix])
+		EP[:eObj] += eTotalCFix
 	end
 
 	### Constratints ###
@@ -167,5 +180,10 @@ function investment_discharge!(EP::Model, inputs::Dict, setup::Dict)
 	# Constraint on minimum capacity (if applicable) [set input to -1 if no constraint on minimum capacity]
 	# DEV NOTE: This constraint may be violated in some cases where Existing_Cap_MW is <= Min_Cap_MW and lead to infeasabilty
 	@constraint(EP, cMinCap[y in intersect(dfGen[dfGen.Min_Cap_MW.>0,:R_ID], 1:G)], eTotalCap[y] >= dfGen[y,:Min_Cap_MW])
+
+	if setup["MinCapReq"] == 1
+		@expression(EP, eMinCapResInvest[mincap = 1:inputs["NumberOfMinCapReqs"]], sum(EP[:eTotalCap][y] for y in dfGen[(dfGen[!,Symbol("MinCapTag_$mincap")].== 1) ,:][!,:R_ID]))
+		EP[:eMinCapRes] += eMinCapResInvest
+	end
 
 end
