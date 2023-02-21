@@ -15,7 +15,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 @doc raw"""
-	morris(EP::Model, path::AbstractString, setup::Dict, inputs::Dict, outpath::AbstractString, OPTIMIZER)
+    morris(EP::Model, path::AbstractString, setup::Dict, inputs::Dict, outpath::AbstractString, OPTIMIZER)
 
 We apply the Method of Morris developed by [Morris, M., 1991](https://www.jstor.org/stable/1269043) in order to identify the input parameters that produce the largest change on total system cost. Method of Morris falls under the simplest class of one-factor-at-a-time (OAT) screening techniques. It assumes l levels per input factor and generates a set of trajectories through the input space. As such, the Method of Morris generates a grid of uncertain model input parameters, $x_i, i=1, ..., k$,, where the range $[x_i^{-}, x_i^{+}$ of each uncertain input parameter i is split into l intervals of equal length. Each trajectory starts at different realizations of input parameters chosen at random and are built by successively selecting one of the inputs randomly and moving it to an adjacent level. These trajectories are used to estimate the mean and the standard deviation of each input parameter on total system cost. A high estimated mean indicates that the input parameter is important; a high estimated standard deviation indicates important interactions between that input parameter and other inputs.
 """
@@ -23,46 +23,30 @@ struct MatSpread{T1,T2}
     mat::T1
     spread::T2
 end
-# store the results of method of morris sensitivity analysis
+
 struct MorrisResult{T1,T2}
     means::T1
     means_star::T1
     variances::T1
     elementary_effects::T2
 end
-
-function generate_design_matrix(p_range, p_steps, rng;len_design_mat,groups) 
-    # p_range: range of lower bound and upper bound values for all the evaluated parameters; 
-    # p_step: the number of steps used in sensitivity analysis, stored in p_steps column in "Method_of_morris_range.csv" seems to be intergers set by users? 
-    # rng : random number
-    # len_design_mat: len_design_mat column in "Method_of_morris_range.csv", the size of design matrix, this seems to be intergers set by users? 
-    # group: type of generators, e.g., solar, wind, etc...
-
-    # Generate the parameter values for each parameter
+function generate_design_matrix(p_range, p_steps, rng;len_design_mat,groups,lb,ub)
     ps = [range(p_range[i][1], stop=p_range[i][2], length=p_steps[i]) for i in 1:length(p_range)]
-    # Generate the initial random indices for the design matrix
     indices = [rand(rng, 1:i) for i in p_steps]
-    # create a vector with "len_design_mat" elements 
     all_idxs_original = Vector{typeof(indices)}(undef,len_design_mat)
-    
+
     for i in 1:len_design_mat
-        # generate a random number j that is less than length(p_range)
         j = rand(rng, 1:length(p_range))
-        # jth index of indices is plus or minus 1 randomly, this simulates the effect of chaing one parameter in the design matrix
         indices[j] += (rand(rng) < 0.5 ? -1 : 1)
-        # if index value is greater than the maximum number of steps (p_steps[j]), then the index value is adjusted by minus 2, why??
         if indices[j] > p_steps[j]
             indices[j] -= 2
-        # if index value is less than 1, then adjusted by adding 2, why???
         elseif indices[j] < 1.0
             indices[j] += 2
         end
         all_idxs_original[i] = copy(indices)
     end
-    # create a data frame that has "len_design_mat" of column, and of "length(p_range)" of row
-    df_all_idx_original = DataFrame(all_idxs_original,:auto)
-    println(df_all_idx_original)
 
+    df_all_idx_original = DataFrame(all_idxs_original,:auto)
     all_idxs = similar(df_all_idx_original)
     for g in unique(groups)
         temp = findall(x->x==g, groups)
@@ -70,8 +54,12 @@ function generate_design_matrix(p_range, p_steps, rng;len_design_mat,groups)
             all_idxs[k,:] = df_all_idx_original[temp[1],:]
         end
     end
-    println(all_idxs)
-    # create a dataframe that has "len_design_mat" of column, and of "length(p_range)" of row; data from the 1st to length(unique(groups)) are the same as the data from length(unique(groups))+ 1 to length(groups)
+    for i in 1:length(p_range)
+        if lb[i]==0 && ub[i]==0
+            all_idxs[i,:] .= 1
+        end
+    end
+
     B = Array{Array{Float64}}(undef,len_design_mat)
     for j in 1:len_design_mat
         cur_p = [ps[u][(all_idxs[:,j][u])] for u in 1:length(p_range)]
@@ -80,8 +68,6 @@ function generate_design_matrix(p_range, p_steps, rng;len_design_mat,groups)
     reduce(hcat, B)
 end
 
-# calculate the spread of each trajectory in the matrix
-# This seem to be the equation in page 4 (Intro_to_Method_of_Morris.pdf"), 
 function calculate_spread(matrix)
     spread = 0.0
     for i in 2:size(matrix,2)
@@ -90,18 +76,20 @@ function calculate_spread(matrix)
     spread
 end
 
-
-function sample_matrices(p_range,p_steps, rng;num_trajectory,total_num_trajectory,len_design_mat,groups)
-    matrix_array = []
-    println(num_trajectory)
-    println(total_num_trajectory)
+function check_trajectory_numbers(num_trajectory, total_num_trajectory)
     if total_num_trajectory<num_trajectory
-        error("total_num_trajectory should be greater than num_trajectory preferably atleast 3-4 times higher")
+        println("For the Morris sensitivity analysis,")
+        println("total_num_trajectory is ", total_num_trajectory)
+        println("num_trajectory is ", num_trajectory)
+        error("but total_num_trajectory should be greater than num_trajectory, preferably 3-4 times higher")
     end
-    # generate_design_matrix gives a matrix with dimensions of p * x; p = number of input paramters and n = number of sample_matrices (also equal to len_design_mat)
-    # each row in the matrix represents a sample in the input parameter sapce, and each colulmn represent a differernt input parameters. 
+end
+
+function sample_matrices(p_range,p_steps, rng;num_trajectory,total_num_trajectory,len_design_mat,groups,lb,ub)
+    matrix_array = []
+    check_trajectory_numbers(num_trajectory, total_num_trajectory)
     for i in 1:total_num_trajectory
-        mat = generate_design_matrix(p_range, p_steps, rng;len_design_mat,groups)
+        mat = generate_design_matrix(p_range, p_steps, rng;len_design_mat,groups,lb,ub)
         spread = calculate_spread(mat)
         push!(matrix_array,MatSpread(mat,spread))
     end
@@ -110,56 +98,46 @@ function sample_matrices(p_range,p_steps, rng;num_trajectory,total_num_trajector
     reduce(hcat,matrices)
 end
 
-function my_gsa(f, p_steps, num_trajectory, total_num_trajectory, p_range::AbstractVector,len_design_mat,groups)
+function my_gsa(f, p_steps, num_trajectory, total_num_trajectory, p_range::AbstractVector,len_design_mat,groups,lb,ub)
     rng = Random.default_rng()
     design_matrices_original = sample_matrices(p_range, p_steps, rng;num_trajectory,
-                                        total_num_trajectory,len_design_mat,groups)
-    println(design_matrices_original)
+                                        total_num_trajectory,len_design_mat,groups,lb,ub)
     L = DataFrame(design_matrices_original,:auto)
-    println(L)
 
-    distinct_trajectories = Array{Int64}(undef,num_trajectory)
+    distinct_trajectories = zero(1)
     design_matrices = Matrix(DataFrame(unique(last, pairs(eachcol(L[!,1:len_design_mat])))))
-    distinct_trajectories[1] = length(design_matrices[1,:])
+    distinct_trajectories = [distinct_trajectories;length(design_matrices[1,:])]
     if num_trajectory > 1
         for i in 2:num_trajectory
-            design_matrices = hcat(design_matrices, Matrix(DataFrame(unique(last, pairs(eachcol(L[!,(i-1)*len_design_mat+1:i*len_design_mat]))))))
-            distinct_trajectories[i] = length(Matrix(DataFrame(unique(last, pairs(eachcol(L[!,(i-1)*len_design_mat+1:i*len_design_mat])))))[1,:])
+            new_mat = Matrix(DataFrame(unique(last, pairs(eachcol(L[!,(i-1)*len_design_mat+1:i*len_design_mat])))))
+            design_matrices = hcat(design_matrices, new_mat)
+            distinct_trajectories = [distinct_trajectories; length(new_mat[1,:])]
         end
     end
-    println(distinct_trajectories)
-    println(design_matrices)
+    distinct_trajectories = cumsum(distinct_trajectories)
 
     multioutput = false
     desol = false
     local y_size
-    # _y stores the objective value from EP based on a given set of inputs.
+
     _y = [f(design_matrices[:,i]) for i in 1:size(design_matrices,2)]
-    # to see if _y has mutiple outputs? 
     multioutput = !(eltype(_y) <: Number)
     if eltype(_y) <: RecursiveArrayTools.AbstractVectorOfArray
         y_size = size(_y[1])
         _y = vec.(_y)
         desol = true
     end
-    # convert to matrix
     all_y = multioutput ? reduce(hcat,_y) : _y
-    println(all_y)
     effects = []
     while(length(effects) < length(groups))
         push!(effects,Vector{Float64}[])
     end
-    # compute the effect of each design matrix on response variable 
-    
-    # j => index of variable of interest; e.g., 1,2,3,...r (investment cost, fixed cost of generators )
-    # i => index of each trajectory, e.g., 1,2,3,4,5....k
 
     for i in 1:num_trajectory
         len_design_mat = distinct_trajectories[i]
-        y1 = multioutput ? all_y[:,(i-1)*len_design_mat+1] : all_y[(i-1)*len_design_mat+1]
-        for j in (i-1)*len_design_mat+1:(i*len_design_mat)-1
+        y1 = multioutput ? all_y[:,2+distinct_trajectories[i]] : all_y[2+distinct_trajectories[i]]
+        for j in 1+distinct_trajectories[i] : distinct_trajectories[i+1] - 1
             y2 = y1
-            # compute the chang between current and previous design matrices
             del = design_matrices[:,j+1] - design_matrices[:,j]
             change_index = 0
             for k in 1:length(del)
@@ -174,26 +152,13 @@ function my_gsa(f, p_steps, num_trajectory, total_num_trajectory, p_range::Abstr
             elem_effect = typeof(y1) <: Number ? effect : mean(effect, dims = 2)
             temp_g_index = findall(x->x==groups[change_index], groups)
             for g in temp_g_index
-                println(effects)
-                println(elem_effect)
                 push!(effects[g],elem_effect)
             end
         end
     end
-    means = eltype(effects[1])[]
-    means_star = eltype(effects[1])[]
-    variances = eltype(effects[1])[]
-    for k in effects
-        if !isempty(k)
-            push!(means, mean(k))
-            push!(means_star, mean(x -> abs.(x), k))
-            push!(variances, var(k))
-        else
-            push!(means, zero(effects[1][1]))
-            push!(means_star, zero(effects[1][1]))
-            push!(variances, zero(effects[1][1]))
-        end
-    end
+
+    means, means_star, variances = computestatistics(effects)
+
     if desol
         f_shape = x -> [reshape(x[:,i],y_size) for i in 1:size(x,2)]
         means = map(f_shape,means)
@@ -202,63 +167,218 @@ function my_gsa(f, p_steps, num_trajectory, total_num_trajectory, p_range::Abstr
     end
     MorrisResult(reduce(hcat, means),reduce(hcat, means_star),reduce(hcat, variances),effects)
 end
+
+function computestatistics(effects)
+    means = eltype(effects[1])[]
+    means_star = eltype(effects[1])[]
+    variances = eltype(effects[1])[]
+    for k in 1:length(effects)
+        if !isempty(effects[k])
+            push!(means, mean(effects[k]))
+            push!(means_star, mean(x -> abs.(x), effects[k]))
+            push!(variances, var(effects[k]))
+        else
+            push!(means, zeros(1))
+            push!(means_star, zeros(1))
+            push!(variances, zeros(1))
+            push!(effects[k], zeros(1))
+        end
+    end
+    return means, means_star, variances
+end
+
+function set_random_seed!(setup::Dict)
+    key = "MethodofMorrisRandomSeed"
+    if haskey(setup, key)
+        seed = setup[key]
+        Random.seed!(seed)
+    end
+end
+
+### functions for imputing zero rows so that not all generators need to be included
+lonely_row_names() = ["total_num_trajectory", "num_trajectory", "len_design_mat", "policy"]
+
+function get_lonely_information(df::DataFrame)::Dict
+    lonely_rows = lonely_row_names()
+    dfr = df[1, lonely_rows]
+    Dict(names(dfr) .=> values(dfr))
+end
+
+function reset_lonely_information!(df::DataFrame, lonely_row::Dict)
+    for col in keys(lonely_row)
+        new_vec = similar(df[:, col])
+        new_vec .= missing
+        new_vec[1] = lonely_row[col]
+
+        df[!, col] = new_vec
+    end
+end
+
+function construct_new_row_data(df::DataFrame, row_dict::Dict)
+    col_names = names(df)
+    lonely_names = lonely_row_names()
+    zero_names = ["Upper_bound", "Lower_bound", "p_steps"]
+    group_names = ["Group"]
+    r = Any[]
+    for c in col_names
+        if c in keys(row_dict)
+            push!(r, row_dict[c])
+        elseif c in lonely_names
+            push!(r, missing)
+        elseif c in zero_names
+            push!(r, 0)
+        elseif c in group_names
+            push!(r, "nogroup")
+        else
+            error("Unknown column ", c, " encountered")
+        end
+    end
+    return r
+end
+
+function fancyinsert!(df::DataFrame, rownum::Int, newrow::Vector{Any})
+    # https://stackoverflow.com/questions/51505007/julia-dataframes-insert-new-row-at-specific-index
+    foreach((c, v) -> insert!(c, rownum, v), eachcol(df), newrow)
+end
+
+
+function insert_absent_resource_rows!(df::DataFrame, df_from_file::Dict, inputs::Dict)
+    final = nrow(df)
+    i = 1
+    j = 1
+
+    resource_for_file(file) = inputs[df_from_file[file]][:, [:Resource, :Zone]]
+
+    function next_correct_row(file, parameter, block, j)
+        Dict("File"=>file, "Parameter"=>parameter,
+            "Resource"=>block[j, :Resource], "Zone"=>block[j, :Zone])
+    end
+
+    length_remaining = 0
+    file = ""
+    parameter = ""
+    block = DataFrame()
+    while i <= final
+        if length_remaining == 0
+            j = 1
+            file = df[i, :File]
+            block = resource_for_file(file)
+            parameter = df[i, :Parameter]
+            length_remaining = nrow(block)
+        end
+
+        row_dict = next_correct_row(file, parameter, block, j)
+
+        this_resource = df[i, :Resource]
+        this_parameter = df[i, :Parameter]
+        this_file = df[i, :File]
+        if this_resource != row_dict["Resource"] || this_parameter != row_dict["Parameter"] || this_file != row_dict["File"]
+            new_row_data = construct_new_row_data(df, row_dict)
+            fancyinsert!(df, i, new_row_data)
+            final += 1
+        end
+
+        length_remaining -= 1
+
+        i += 1
+        j += 1
+    end
+
+    # begin 'extra innings' to complete the last cycle
+    if i == final + 1 && length_remaining > 0
+        final += length_remaining
+        for i in i:final
+            row_dict = next_correct_row(file, parameter, block, j)
+            new_row_data = construct_new_row_data(df, row_dict)
+            fancyinsert!(df, i, new_row_data)
+            j += 1
+        end
+    end
+end
+
+function impute_morris_instructions!(df::DataFrame, df_from_file::Dict, inputs::Dict)
+    lonely_data = get_lonely_information(df)
+    insert_absent_resource_rows!(df, df_from_file, inputs)
+    reset_lonely_information!(df, lonely_data)
+end
+
 function morris(EP::Model, path::AbstractString, setup::Dict, inputs::Dict, outpath::AbstractString, OPTIMIZER)
 
     # Reading the input parameters
+    set_random_seed!(setup)
     Morris_range = load_dataframe(joinpath(path, "Method_of_morris_range.csv"))
+    dataframe_for_file = Dict("Generators_data"=>"dfGen",
+                              "Fleccs_data"=>"dfGen_ccs",
+                              "Thermal_storage"=>"dfTS")
+    impute_morris_instructions!(Morris_range, dataframe_for_file, inputs)
     groups = Morris_range[!,:Group]
-    # p_steps seems to be integers set by users?
     p_steps = Morris_range[!,:p_steps]
-    #  total_num_trajectory seems to be integers set by users?
-    total_num_trajectory = Morris_range[!,:total_num_trajectory][1]
-    num_trajectory = Morris_range[!,:num_trajectory][1]
-    len_design_mat = Morris_range[!,:len_design_mat][1]
-    # parameters, e.g., inv_cost_per_MWyr, Fixed_OM_Cost_per_MWyr, etc.
-    uncertain_columns = unique(Morris_range[!,:Parameter])
-    #save_parameters = zeros(length(Morris_range[!,:Parameter]))
+    p_steps[p_steps .< 1] .= 1
+    total_num_trajectory = Morris_range[1,:total_num_trajectory]
+    num_trajectory = Morris_range[1,:num_trajectory]
+    len_design_mat = Morris_range[1,:len_design_mat]
+    files = unique(Morris_range[!,:File])
+    lb = Morris_range[!,:Lower_bound]
+    ub = Morris_range[!,:Upper_bound]
+    save_parameters = zeros(nrow(Morris_range))
+
 
     # Creating the range of uncertain parameters in terms of absolute values
-    sigma = zeros((1, 2))
-    for column in uncertain_columns
-                        # 1. determine the absolute values of the lower/upper bound; 2. create a matrix that summarize the lower/upper bound values;
-                        # 3. bind the matrix via for loop
-        sigma = [sigma; [inputs["dfGen"][!,Symbol(column)] .* (1 .+ Morris_range[Morris_range[!,:Parameter] .== column, :Lower_bound] ./100) inputs["dfGen"][!,Symbol(column)] .* (1 .+ Morris_range[Morris_range[!,:Parameter] .== column, :Upper_bound] ./100)]]
+    lower_sigmas = Float64[]
+    upper_sigmas = Float64[]
+    for f in files
+        my_df = inputs[dataframe_for_file[f]]
+        entries_for_file = Morris_range[!, :File].==f
+        uncertain_columns = unique(Morris_range[entries_for_file, :Parameter])
+        for column in uncertain_columns
+            entries_for_param = Morris_range[!, :Parameter].==column
+            sel = entries_for_file .& entries_for_param
+            lower_sigma = my_df[!,Symbol(column)] .* (1 .+ Morris_range[sel, :Lower_bound] ./100)
+            upper_sigma = my_df[!,Symbol(column)] .* (1 .+ Morris_range[sel, :Upper_bound] ./100)
+            append!(lower_sigmas, lower_sigma)
+            append!(upper_sigmas, upper_sigma)
+        end
     end
-    #  do not include the first row because the first row from the last step is 0 0
-    sigma = sigma[2:end,:]
-    # convert matrix to another format?
-    p_range = mapslices(x->[x], sigma, dims=2)[:]
+
+    p_range = mapslices(x->[x], [lower_sigmas upper_sigmas], dims=2)[:]
+    obj_val = zeros(1)
 
     # Creating a function for iteratively solving the model with different sets of input parameters
     f1 = function(sigma)
-        #print(sigma)
-        print("\n")
-        #save_parameters = hcat(save_parameters, sigma)
+        save_parameters = hcat(save_parameters, sigma)
 
-        for column in uncertain_columns
-            # create index list 
-            index = findall(s -> s == column, Morris_range[!,:Parameter])
-            # change the input data of evaluated parameter to the lower bound values that are stored in sigma. Why only lower bound parameters??
-            inputs["dfGen"][!,Symbol(column)] = sigma[first(index):last(index)]
+        for f in files
+            my_df = inputs[dataframe_for_file[f]]
+            entries_for_file = Morris_range[!, :File].==f
+            uncertain_columns = unique(Morris_range[entries_for_file, :Parameter])
+            for column in uncertain_columns
+                entries_for_param = Morris_range[!, :Parameter].==column
+                sel = entries_for_file .& entries_for_param
+                index = (1:length(sel))[sel]
+                my_df[!,Symbol(column)] = sigma[first(index):last(index)]
+            end
         end
 
         EP = generate_model(setup, inputs, OPTIMIZER)
         #EP, solve_time = solve_model(EP, setup)
-        optimize!(EP)
-        #redirect_stdout((()->optimize!(EP)),open("/dev/null", "w"))
+        redirect_stdout((()->optimize!(EP)),open("/dev/null", "w"))
         [objective_value(EP)]
+        obj_val = hcat(obj_val, objective_value(EP))
     end
 
     # Perform the method of morris analysis
-    m = my_gsa(f1,p_steps,num_trajectory,total_num_trajectory,p_range,len_design_mat,groups)
-    println(m.means)
-    println(DataFrame(m.means', :auto))
+    m = my_gsa(f1,p_steps,num_trajectory,total_num_trajectory,p_range,len_design_mat,groups,lb,ub)
     #save the mean effect of each uncertain variable on the objective fucntion
     Morris_range[!,:mean] = DataFrame(m.means', :auto)[!,:x1]
-    println(DataFrame(m.variances', :auto))
     #save the variance of effect of each uncertain variable on the objective function
     Morris_range[!,:variance] = DataFrame(m.variances', :auto)[!,:x1]
+    Morris_range[!,:means_star] = DataFrame(m.means_star', :auto)[!,:x1]
 
-    CSV.write(joinpath(outpath, "morris.csv"), Morris_range)
+    CSV.write(joinpath(outpath,"morris.csv"), Morris_range)
+    CSV.write(joinpath(outpath,"morris_objective.csv"), DataFrame(obj_val,:auto))
+    CSV.write(joinpath(outpath,"morris_parameters.csv"), DataFrame(save_parameters,:auto))
+    # TODO this should be converted to a dataframe somehow, if we want it?
+    # writedlm was from the DelimitedFiles package
+    #writedlm(joinpath(outpath,"morris_elementary_effects.csv"),  m.elementary_effects, ',')
 
 end

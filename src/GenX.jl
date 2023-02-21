@@ -58,7 +58,7 @@ using Gurobi
 #using CPLEX
 #using MOI
 #using SCIP
-using HiGHS
+#using HiGHS
 using Clp
 using Cbc
 
