@@ -97,7 +97,7 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 
 	# Generate Energy Portfolio (EP) Model
 	EP = Model(OPTIMIZER)
-	set_string_names_on_creation(EP, Bool(setup["EnableJuMPStringNames"]))
+	#set_string_names_on_creation(EP, Bool(setup["EnableJuMPStringNames"]))
 	# Introduce dummy variable fixed to zero to ensure that expressions like eTotalCap,
 	# eTotalCapCharge, eTotalCapEnergy and eAvail_Trans_Cap all have a JuMP variable
 	@variable(EP, vZERO == 0);
@@ -137,7 +137,9 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		ucommit!(EP, inputs, setup)
 	end
 
-	emissions!(EP, inputs)
+	fuel!(EP, inputs, setup)
+
+	#emissions!(EP, inputs)
 
 	if setup["Reserves"] > 0
 		reserves!(EP, inputs, setup)
@@ -191,6 +193,13 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 	# Policies
 	# CO2 emissions limits
 	co2_cap!(EP, inputs, setup)
+
+	co2!(EP, inputs, setup) 
+
+	# CO2 Tax
+	if setup["CO2Tax"] == 1
+		co2_tax!(EP, inputs, setup)
+	end
 
 	# Endogenous Retirements
 	if setup["MultiStage"] > 0

@@ -94,6 +94,7 @@ include("load_inputs/load_reserves.jl")
 include("load_inputs/load_cap_reserve_margin.jl")
 include("load_inputs/load_energy_share_requirement.jl")
 include("load_inputs/load_co2_cap.jl")
+include("load_inputs/load_co2_tax.jl")
 include("load_inputs/load_period_map.jl")
 include("load_inputs/load_minimum_capacity_requirement.jl")
 include("load_inputs/load_load_data.jl")
@@ -111,6 +112,8 @@ include("model/core/discharge/investment_discharge.jl")
 include("model/core/non_served_energy.jl")
 include("model/core/ucommit.jl")
 include("model/core/emissions.jl")
+include("model/core/co2.jl")
+include("model/core/fuel.jl")
 
 include("model/core/reserves.jl")
 
@@ -140,9 +143,11 @@ include("model/resources/thermal/thermal_no_commit.jl")
 include("model/resources/retrofits/retrofits.jl")
 
 include("model/policies/co2_cap.jl")
+include("model/policies/co2_tax.jl")
 include("model/policies/energy_share_requirement.jl")
 include("model/policies/cap_reserve_margin.jl")
 include("model/policies/minimum_capacity_requirement.jl")
+
 
 include("model/generate_model.jl")
 include("model/solve_model.jl")

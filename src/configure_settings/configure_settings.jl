@@ -68,6 +68,16 @@ function configure_settings(settings_path::String)
     set_default_if_absent!(settings, "CapResPeriodLength", 0)
     # Capacity Reserve Period Length for storage
 
+    # CO2 tax; 0 = not active, 1 = active
+    set_default_if_absent!(settings, "CO2Tax", 0)
+    # CO2 capture; 0 = not active, 1 = active
+    set_default_if_absent!(settings, "CO2Capture", 0)
+    # FLECCS
+    set_default_if_absent!(settings, "FLECCS", 0)
+    # Piecewise fuel consumption
+    set_default_if_absent!(settings, "PieceWiseHeatRate", 0)
+
+
 
 return settings
 end
