@@ -54,7 +54,7 @@ using Statistics
 
 # Uncomment if Gurobi or CPLEX active license and installations are there and the user intends to use either of them
 #using CPLEX
-#using Gurobi
+using Gurobi
 #using CPLEX
 #using MOI
 #using SCIP
@@ -99,6 +99,7 @@ include("load_inputs/load_period_map.jl")
 include("load_inputs/load_minimum_capacity_requirement.jl")
 include("load_inputs/load_load_data.jl")
 include("load_inputs/load_fuels_data.jl")
+include("load_inputs/load_dac_data.jl")
 
 include("load_inputs/load_inputs.jl")
 
@@ -139,6 +140,8 @@ include("model/resources/storage/storage_symmetric.jl")
 include("model/resources/thermal/thermal.jl")
 include("model/resources/thermal/thermal_commit.jl")
 include("model/resources/thermal/thermal_no_commit.jl")
+
+include("model/resources/dac.jl")
 
 include("model/resources/retrofits/retrofits.jl")
 
@@ -200,6 +203,10 @@ include("write_outputs/transmission/write_transmission_losses.jl")
 include("write_outputs/ucommit/write_commit.jl")
 include("write_outputs/ucommit/write_shutdown.jl")
 include("write_outputs/ucommit/write_start.jl")
+
+include("write_outputs/dac/write_dac_capacity.jl")
+include("write_outputs/dac/write_dac_co2.jl")
+
 
 include("write_outputs/write_outputs.jl")
 

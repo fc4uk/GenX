@@ -20,28 +20,28 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 Read input parameters related to dac
 """
 
-function load_dac_data!(setup::Dict, path::AbstractString, inputs_gen::Dict, fuel_CO2:: Dict)
-    filename ="Dac.csv"
+function load_dac_data!(setup::Dict, path::AbstractString, inputs::Dict)
+    filename ="dac.csv"
 
-    dac_in = DataFrame(CSV.File(joinpath(path, filename), header=true), copycols=true)
+    dac_in = load_dataframe(joinpath(path, filename))
 
 	# Add Resource IDs after reading to prevent user errors
 	dac_in[!,:DAC_ID] = 1:length(collect(skipmissing(dac_in[!,1])))
 
 	# Store DataFrame of dac input data for use in model
-	inputs_gen["dfDac"] = dac_in
+	inputs["dfDac"] = dac_in
 
     # Number of resources
-	inputs_gen["D"] = length(collect(skipmissing(dac_in[!,:DAC_ID])))
+	inputs["D"] = length(collect(skipmissing(dac_in[!,:DAC_ID])))
 
 	# Set indices for internal use
-	D = inputs_gen["D"]   # Number of DAC resources 
+	D = inputs["D"]   # Number of DAC resources 
 
     # Zones resources are located in
-	zones = collect(skipmissing(dac_in[!,:Zone][1:inputs_gen["D"]]))
+	zones = collect(skipmissing(dac_in[!,:Zone][1:inputs["D"]]))
 	# Resource identifiers by zone (just zones in resource order + resource and zone concatenated)
-	inputs_gen["D_ZONES"] = zones
-	inputs_gen["dfDac"]["DAC_ZONES"] = dac_in["RESOURCES"] .* "_z" .* string.(zones)
+	inputs["D_ZONES"] = zones
+	#inputs["dfDac"][!,:DAC_ZONES] = dac_in["RESOURCES"] .* "_z" .* string.(zones)
 
 
 
@@ -53,17 +53,18 @@ function load_dac_data!(setup::Dict, path::AbstractString, inputs_gen::Dict, fue
 
     if setup["ParameterScale"] == 1  # Parameter scaling turned on - adjust values of subset of parameter values, t CO2 should be converted to kt CO2
         # I dont think we have exiting capacity for DAC..so I will just do the conversion for Fixed Cost, VOM, heat, electricity consumption
-        inputs_gen["dfDac"][!, :Fix_Cost_per_CO2perHr_yr] = dac_in[!, :Fix_Cost_per_CO2perHr_yr]/ModelScalingFactor
+        inputs["dfDac"][!, :Fix_Cost_per_CO2perHr_yr] = dac_in[!, :Fix_Cost_per_CO2perHr_yr]/ModelScalingFactor
 
-        inputs_gen["dfDac"][!, :Var_OM_Cost_per_CO2] = dac_in[!, :Var_OM_Cost_per_CO2]/ModelScalingFactor
+        inputs["dfDac"][!, :Var_OM_Cost_per_CO2] = dac_in[!, :Var_OM_Cost_per_CO2]/ModelScalingFactor
 
-        inputs_gen["dfDac"][!, :Heat_MMBTU_per_CO2_metric_ton] = dac_in[!, :Heat_MMBTU_per_CO2_metric_ton]/ModelScalingFactor
+        inputs["dfDac"][!, :Heat_MMBTU_per_CO2_metric_ton] = dac_in[!, :Heat_MMBTU_per_CO2_metric_ton]/ModelScalingFactor
 
-        inputs_gen["dfDac"][!, :Electricity_MWh_per_CO2_metric_ton] = dac_in[!, :Electricity_MWh_per_CO2_metric_ton]/ModelScalingFactor
+        inputs["dfDac"][!, :Electricity_MWh_per_CO2_metric_ton] = dac_in[!, :Electricity_MWh_per_CO2_metric_ton]/ModelScalingFactor
     end
 
     println(filename * " Successfully Read!")
 
+   # return inputs
 end
 
 

@@ -18,7 +18,7 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 	DAC
 """
 
-function dac(EP::Model, inputs::Dict)
+function dac!(EP::Model, inputs::Dict)
 
 	println("DAC module")
 
@@ -56,12 +56,12 @@ function dac(EP::Model, inputs::Dict)
     @expression(EP, eDAC_heat_consumption[y in DAC_ID, t = 1:T], vCO2_DAC[y,t] * dfDac[y,:Heat_MMBTU_per_CO2_metric_ton])
     # the use of heat resources (e.g., natural gas) may result in additional CO2 emissions as DAC may not capture the CO2 from the heat resources
     # CO2 from the use of heat resource
-    @expression(EP, eDAC_heat_CO2[y in DAC_ID, t = 1:T], eDAC_heat_consumption[y,t]* fuel_CO2[dfDAC[y,:DAC_heat_resource]] )
+    @expression(EP, eDAC_heat_CO2[y in DAC_ID, t = 1:T], eDAC_heat_consumption[y,t]* fuel_CO2[dfDac[y,:DAC_heat_resource]] )
     # the electricity consumption for DAC, MWh/t CO2
     @expression(EP, eDAC_power[y in DAC_ID, t = 1:T], vCO2_DAC[y,t] * dfDac[y,:Electricity_MWh_per_CO2_metric_ton])
     # the power used for DAC is draw from the grid, so we have a power balance equation
 	@expression(EP, ePowerBalanceDAC[t=1:T, z=1:Z],
-		sum(eDAC_power[y,t] for y in intersect(dfDac[dfDAC[!,:Zone].==z,:][!,:DAC_ID])))
+		sum(eDAC_power[y,t] for y in intersect(dfDac[dfDac[!,:Zone].==z,:][!,:DAC_ID])))
 		
 	EP[:ePowerBalance] = EP[:ePowerBalance] - ePowerBalanceDAC
 
@@ -72,30 +72,38 @@ function dac(EP::Model, inputs::Dict)
     # Fixed Cost
     # Combine CAPEX and FOM into annulized Fixed Cost
     # Fixed cost for a DAC y 
-	@expression(EP, eCFixed_DAC[y in TS], dfDac[y,:Fixed_Cost_per_MW_th] * vCAP_DAC[y])
+	@expression(EP, eCFixed_DAC[y in DAC_ID], dfDac[y,:Fix_Cost_per_CO2perHr_yr] * vCAP_DAC[y])
 	# total fixed costs for all the DAC
 	@expression(EP, eTotalCFixedDAC, sum(eCFixed_DAC[y] for y in DAC_ID))
 	EP[:eObj] += eTotalCFixedDAC
 
+
     # Variable cost
     omega = inputs["omega"]
     # the total variable cost (heat cost + non-fuel vom cost) for DAC y at time t, $/t CO2  
-    @expression(EP, eCDAC_Variable[y in DAC_ID, t = 1:T], omega * (eDAC_heat_consumption[y,t] * fuel_cost[dfDAC[y,:DAC_heat_resource]][t] +dfDac[y,:Var_OM_Cost_per_CO2]*vCO2_DAC[y,t]))
-    # Cost associated with variable cost for all the DAC at time T
-    @expression(EP, eCTotalVariableDACT[ t = 1:T], eCDAC_Variable[y,t] for y in DAC_ID )
+    @expression(EP, eCDAC_Variable[y in DAC_ID, t = 1:T],  (eDAC_heat_consumption[y,t] * fuel_cost[dfDac[y,:DAC_heat_resource]][t] + dfDac[y,:Var_OM_Cost_per_CO2]*vCO2_DAC[y,t]))
+
+    # Cost associated with variable cost for DAC for the whole year
+    
+    @expression(EP, eCTotalVariableDACT[y in DAC_ID], sum(omega[t] * eCDAC_Variable[y,t] for t in 1:T ))
+
     # Total vairable cost for all the DAC at all the time
-    @expression(EP, eCTotalVariableDAC, eCTotalVariableDACT[t] for t in 1:T )
+    @expression(EP, eCTotalVariableDAC, sum(eCTotalVariableDACT[y] for y in DAC_ID ))
 
     EP[:eObj] += eCTotalVariableDAC
-    
+
     # skip the unit commitment for DAC for now, will implement constraint formulation later...
     # get the CO2 balance 
     # the net negative CO2 for each DAC y at each hour t, CO2 emissions from heat consumption minus CO2 captured by DAC = net negative emissions
     @expression(EP, eCO2_DAC_net[y in DAC_ID, t = 1:T], eDAC_heat_CO2[y,t] - vCO2_DAC[y,t] )
-
-    expression(EP, eCO2_DAC_net_ByZone[z = 1:Z, t = 1:T], 
+    # the net negative CO2 from all the DAC
+    @expression(EP, eCO2_DAC_net_ByZoneT[z = 1:Z, t = 1:T], 
         sum(eCO2_DAC_net[y, t] for y in dfDac[(dfDac[!, :Zone].==z), :DAC_ID]))
-    # the net negative CO2 from all the DAC 
+    # the net negative CO2 from all the DAC during the whole year
+    @expression(EP, eCO2_DAC_net_ByZone[z = 1:Z], 
+        sum(eCO2_DAC_net_ByZoneT[z, t] for t in 1:T))
+    # sum of net CO2 across all the zone
+    @expression(EP, eCO2_ToT_DAC_net, sum(eCO2_DAC_net_ByZone[z] for z in 1:Z))
     
     return EP
 end

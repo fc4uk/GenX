@@ -72,18 +72,39 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
     #@expression(EP, eEmissionsByZone[z = 1:Z, t = 1:T], 
     #    sum(eEmissionsByPlant[y, t] for y in dfGen[(dfGen[!, :Zone].==z), :R_ID]))
     
+
+    #
+    @expression(EP, eEmissionsByZoneAll[z=1:Z, t=1:T], 0)
+    
+    # emissions from generator_data.csv
+    @expression(EP, eEmissionsByZone[z = 1:Z, t = 1:T], 
+    sum(eEmissionsByPlant[y, t] for y in dfGen[(dfGen[!, :Zone].==z), :R_ID]))
+
+    eEmissionsByZoneAll += eEmissionsByZone
+
     # CO2 emissions from FLECCS 
 	if setup["FLECCS"] >= 1
         gen_ccs = inputs["dfGen_ccs"]
-	    @expression(EP, eEmissionsByZone[z=1:Z, t=1:T], 
-        sum(eEmissionsByPlant[y, t] for y in dfGen[(dfGen[!, :Zone].==z), :R_ID]) + sum(EP[:eEmissionsByPlantFLECCS][y,t] for y in unique(gen_ccs[(gen_ccs[!,:Zone].==z),:R_ID])))
-    else
-        @expression(EP, eEmissionsByZone[z = 1:Z, t = 1:T], 
-        sum(eEmissionsByPlant[y, t] for y in dfGen[(dfGen[!, :Zone].==z), :R_ID]))
+	    @expression(EP, eEmissionsByZoneFleccs[z=1:Z, t=1:T], 
+        sum(EP[:eEmissionsByPlantFLECCS][y,t] for y in unique(gen_ccs[(gen_ccs[!,:Zone].==z),:R_ID])))
+        eEmissionsByZoneAll += eEmissionsByZoneFleccs
+    end
+
+    if setup["DAC"] >= 1
+        dfDac = inputs["dfDac"]
+	    @expression(EP, eEmissionsByZoneDAC[z=1:Z, t=1:T], 
+        sum(EP[:eCO2_DAC_net][y,t] for y in unique(dfDac[(dfDac[!,:Zone].==z),:DAC_ID])))
+        eEmissionsByZoneAll += eEmissionsByZoneDAC
     end
 
     @expression(EP, eEmissionsByZoneYear[z = 1:Z], 
-        sum(inputs["omega"][t] * eEmissionsByZone[z, t] for t in 1:T))
+        sum(eEmissionsByZoneAll[z, t] for t in 1:T))
+
+    @expression(EP, eEmissionsTotalZoneYear, 
+        sum(eEmissionsByZoneYear[z] for z in 1:Z))
+
+    # CO2 zontal constraint
+    @constraint(EP, eEmissionsTotalZoneYear == 0)
 
     return EP
 

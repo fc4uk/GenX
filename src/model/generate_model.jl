@@ -190,6 +190,13 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		EP = retrofit(EP, inputs)
 	end
 
+	#DAC
+	if (setup["DAC"] == 1)
+		dac!(EP, inputs)
+	end
+	
+
+
 	# Policies
 	# CO2 emissions limits
 	co2_cap!(EP, inputs, setup)
@@ -219,6 +226,7 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 	if (setup["MinCapReq"] == 1)
 		minimum_capacity_requirement!(EP, inputs, setup)
 	end
+
 
 	## Define the objective function
 	@objective(EP,Min,EP[:eObj])
