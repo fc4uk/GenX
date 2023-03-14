@@ -76,7 +76,7 @@ function load_inputs(setup::Dict,path::AbstractString)
 		load_co2_tax!(setup, path, inputs)
 	end
 
-	if setup["DAC"] >= 1
+	if setup["DAC"] == 1
 		load_dac_data!(setup, path, inputs)
 	end
 

@@ -27,11 +27,7 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 	DAC_COMMIT = dfDac[dfDac[!,:DAC_COMMIT] .==1,:R_ID]
 	capdDac = zeros(size(dfDac[!,:RESOURCES]))
 	for i in  NEW_CAP
-		if i in DAC_COMMIT
-			capdDac[i] = value(EP[:vCAP_DAC][i])*dfDac[!,:DCap_Size][i]
-		else
-			capdDac[i] = value(EP[:vCAP_DAC][i])
-		end
+		capdDac[i] = value(EP[:vCAP_DAC][i])
 	end
 
 
@@ -43,10 +39,9 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 		EndCap = capdDac[:],
 	)
 	if setup["ParameterScale"] ==1
-		dfCapDac.StartCap = dfCapDac.StartCap * ModelScalingFactor
-		dfCapDac.RetCap = dfCapDac.RetCap * ModelScalingFactor
-		dfCapDac.NewCap = dfCapDac.NewCap * ModelScalingFactor
-		dfCapDac.EndCap = dfCapDac.EndCap * ModelScalingFactor
+		dfCapDac.StartCap = dfCapDac.StartCap * ModelScalingFactor^2
+		dfCapDac.NewCap = dfCapDac.NewCap * ModelScalingFactor^2
+		dfCapDac.EndCap = dfCapDac.EndCap * ModelScalingFactor^2
 	end
 
 

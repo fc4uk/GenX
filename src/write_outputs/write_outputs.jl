@@ -135,7 +135,7 @@ function write_outputs(EP::Model, path::AbstractString, setup::Dict, inputs::Dic
 
 
 	##write DAC
-	if setup["DAC"] >= 0
+	if setup["DAC"] == 1
 		write_dac_capacity(path, inputs, setup, EP)
 		write_dac_co2(path, inputs, setup, EP)
 	end

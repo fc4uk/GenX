@@ -192,7 +192,7 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 
 	#DAC
 	if (setup["DAC"] == 1)
-		dac!(EP, inputs)
+		dac!(EP, inputs, setup)
 	end
 	
 

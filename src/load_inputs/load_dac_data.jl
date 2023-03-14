@@ -51,15 +51,20 @@ function load_dac_data!(setup::Dict, path::AbstractString, inputs::Dict)
     # the unit of heat consumption is MMBTU/t CO2
     # the unit of electricity consumption is MWh/t CO2
 
-    if setup["ParameterScale"] == 1  # Parameter scaling turned on - adjust values of subset of parameter values, t CO2 should be converted to kt CO2
+    if setup["ParameterScale"] == 1  # Parameter scaling turned on - adjust values of subset of parameter values
+        # keep the unit of CO2 to be t through out of the calculations...
+        # convert the cost from $/t CO2/h to million $/t CO2/h
         # I dont think we have exiting capacity for DAC..so I will just do the conversion for Fixed Cost, VOM, heat, electricity consumption
-        inputs["dfDac"][!, :Fix_Cost_per_CO2perHr_yr] = dac_in[!, :Fix_Cost_per_CO2perHr_yr]/ModelScalingFactor
+        #inputs["dfDac"][!, :Fix_Cost_per_CO2perHr_yr] = dac_in[!, :Fix_Cost_per_CO2perHr_yr]/ModelScalingFactor
 
-        inputs["dfDac"][!, :Var_OM_Cost_per_CO2] = dac_in[!, :Var_OM_Cost_per_CO2]/ModelScalingFactor
+        #inputs["dfDac"][!, :Var_OM_Cost_per_CO2] = dac_in[!, :Var_OM_Cost_per_CO2]/ModelScalingFactor
 
-        inputs["dfDac"][!, :Heat_MMBTU_per_CO2_metric_ton] = dac_in[!, :Heat_MMBTU_per_CO2_metric_ton]/ModelScalingFactor
-
-        inputs["dfDac"][!, :Electricity_MWh_per_CO2_metric_ton] = dac_in[!, :Electricity_MWh_per_CO2_metric_ton]/ModelScalingFactor
+        #MMBTU/t CO2/h =>Billion BTu/t CO2/h
+        inputs["dfDac"][!, :Heat_MMBTU_per_CO2_metric_ton] = dac_in[!, :Heat_MMBTU_per_CO2_metric_ton]*ModelScalingFactor
+        #MWh/t CO2/h =>GWh/t CO2/h
+        inputs["dfDac"][!, :Electricity_MWh_per_CO2_metric_ton] = dac_in[!, :Electricity_MWh_per_CO2_metric_ton]*ModelScalingFactor
+    
+        #inputs["dfDac"][!, :Max_Cap_DAC] = dac_in[!, :Max_Cap_DAC]/ModelScalingFactor
     end
 
     println(filename * " Successfully Read!")

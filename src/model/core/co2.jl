@@ -90,7 +90,7 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
         eEmissionsByZoneAll += eEmissionsByZoneFleccs
     end
 
-    if setup["DAC"] >= 1
+    if setup["DAC"] == 1
         dfDac = inputs["dfDac"]
 	    @expression(EP, eEmissionsByZoneDAC[z=1:Z, t=1:T], 
         sum(EP[:eCO2_DAC_net][y,t] for y in unique(dfDac[(dfDac[!,:Zone].==z),:DAC_ID])))
@@ -104,7 +104,9 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
         sum(eEmissionsByZoneYear[z] for z in 1:Z))
 
     # CO2 zontal constraint
-    @constraint(EP, eEmissionsTotalZoneYear == 0)
+    if setup["NetZero"] == 1
+        @constraint(EP, eEmissionsTotalZoneYear == 0)
+    end
 
     return EP
 
