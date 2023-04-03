@@ -43,6 +43,8 @@ function configure_settings(settings_path::String)
     set_default_if_absent!(settings, "StorageLosses", 1)
     # Activate minimum technology carveout constraints; 0 = not active; 1 = active
     set_default_if_absent!(settings, "MinCapReq", 0)
+    # Activate maximum technology carveout constraints; 0 = not active; 1 = active
+    set_default_if_absent!(settings, "MaxCapReq", 0)
     # Available solvers: Gurobi, CPLEX, CLPs
     set_default_if_absent!(settings, "Solver", "HiGHS")
     # Turn on parameter scaling wherein load, capacity and power variables are defined in GW rather than MW. 0 = not active; 1 = active systemwide
@@ -65,8 +67,6 @@ function configure_settings(settings_path::String)
     set_default_if_absent!(settings, "MultiStage", 0)
     # No JuMP String name reporting at model generation by default, to expedite model generation; true if JuMP string names need to be enabled
     set_default_if_absent!(settings, "EnableJuMPStringNames", false)
-    set_default_if_absent!(settings, "CapResPeriodLength", 0)
-    # Capacity Reserve Period Length for storage
 
     # CO2 tax; 0 = not active, 1 = active
     set_default_if_absent!(settings, "CO2Tax", 0)

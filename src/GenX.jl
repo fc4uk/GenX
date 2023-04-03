@@ -58,7 +58,6 @@ using Gurobi
 #using CPLEX
 #using MOI
 #using SCIP
-using BenchmarkTools
 using HiGHS
 using Clp
 using Cbc
@@ -101,8 +100,14 @@ include("load_inputs/load_load_data.jl")
 include("load_inputs/load_fuels_data.jl")
 include("load_inputs/load_dac_data.jl")
 
-include("load_inputs/load_inputs.jl")
+include_all_in_folder("case_runners")
+include_all_in_folder("configure_settings")
+include_all_in_folder("configure_solver")
+include_all_in_folder("load_inputs")
+include_all_in_folder("model")
+include_all_in_folder("write_outputs")
 
+# don't want to include PreCluster.jl
 include("time_domain_reduction/time_domain_reduction.jl")
 
 #Core GenX Features
@@ -213,18 +218,6 @@ include("write_outputs/write_outputs.jl")
 #Just for unit testing; Under active development
 include("simple_operation.jl")
 
-# Multi Stage files
-include("multi_stage/write_multi_stage_settings.jl")
-include("multi_stage/write_multi_stage_capacities_discharge.jl")
-include("multi_stage/write_multi_stage_capacities_charge.jl")
-include("multi_stage/write_multi_stage_capacities_energy.jl")
-include("multi_stage/write_multi_stage_network_expansion.jl")
-include("multi_stage/write_multi_stage_costs.jl")
-include("multi_stage/write_multi_stage_stats.jl")
-include("multi_stage/dual_dynamic_programming.jl")
-include("multi_stage/configure_multi_stage_inputs.jl")
-include("multi_stage/endogenous_retirement.jl")
-
-include("additional_tools/modeling_to_generate_alternatives.jl")
-include("additional_tools/method_of_morris.jl")
+include_all_in_folder("multi_stage")
+include_all_in_folder("additional_tools")
 end

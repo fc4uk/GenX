@@ -122,8 +122,12 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		@expression(EP, eESR[ESR=1:inputs["nESR"]], 0)
 	end
 
-	if (setup["MinCapReq"] == 1)
+	if setup["MinCapReq"] == 1
 		@expression(EP, eMinCapRes[mincap = 1:inputs["NumberOfMinCapReqs"]], 0)
+	end
+
+	if setup["MaxCapReq"] == 1
+		@expression(EP, eMaxCapRes[maxcap = 1:inputs["NumberOfMaxCapReqs"]], 0)
 	end
 
 	# Infrastructure
@@ -199,7 +203,9 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 
 	# Policies
 	# CO2 emissions limits
-	co2_cap!(EP, inputs, setup)
+	if setup["CO2Cap"] > 0
+		co2_cap!(EP, inputs, setup)
+	end
 
 	co2!(EP, inputs, setup) 
 
@@ -227,6 +233,9 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		minimum_capacity_requirement!(EP, inputs, setup)
 	end
 
+	if setup["MaxCapReq"] == 1
+		maximum_capacity_requirement!(EP, inputs, setup)
+	end
 
 	## Define the objective function
 	@objective(EP,Min,EP[:eObj])
