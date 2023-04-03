@@ -97,14 +97,15 @@ function dac!(EP::Model, inputs::Dict, setup::Dict)
     
 
     if setup["UCommit"] > 0
+        DAC_COMMIT = dfDac[dfDac[!,:DAC_COMMIT] .== 1, :R_ID]
         @variables(EP, begin
-            vCOMMIT_DAC[y in DAC_ID, t=1:T] >= 0 # commitment status
-            vSTART_DAC[y in DAC_ID, t=1:T] >= 0 # startup
-            vSHUT_DAC[y in DAC_ID, t=1:T] >= 0 # shutdown
+            vCOMMIT_DAC[y in DAC_COMMIT, t=1:T] >= 0 # commitment status
+            vSTART_DAC[y in DAC_COMMIT, t=1:T] >= 0 # startup
+            vSHUT_DAC[y in DAC_COMMIT, t=1:T] >= 0 # shutdown
         end)
 
          # set the unit commitment variables to integer is UC = 1
-        for y in DAC_ID
+        for y in DAC_COMMIT
 		    if setup["UCommit"] == 1
 			    set_integer.(vCOMMIT_DAC[y,:])
 			    set_integer.(vSTART_DAC[y,:])
@@ -115,14 +116,14 @@ function dac!(EP::Model, inputs::Dict, setup::Dict)
 
 
         @constraints(EP, begin
-		    [y in DAC_ID, t=1:T], vCOMMIT_DAC[y,t] <= EP[:vCAP_DAC][y] / dfDac[y,:Cap_Size]
-		    [y in DAC_ID, t=1:T], vSTART_DAC[y,t] <= EP[:vCAP_DAC][y] / dfDac[y,:Cap_Size]
-		    [y in DAC_ID, t=1:T], vSHUT_DAC[y,t] <= EP[:vCAP_DAC][y] / dfDac[y,:Cap_Size]
+		    [y in DAC_COMMIT, t=1:T], vCOMMIT_DAC[y,t] <= EP[:vCAP_DAC][y] / dfDac[y,:Cap_Size]
+		    [y in DAC_COMMIT, t=1:T], vSTART_DAC[y,t] <= EP[:vCAP_DAC][y] / dfDac[y,:Cap_Size]
+		    [y in DAC_COMMIT, t=1:T], vSHUT_DAC[y,t] <= EP[:vCAP_DAC][y] / dfDac[y,:Cap_Size]
 	    end)
 
 
         #max
-        DAC_COMMIT = dfDac[!,:DAC_COMMIT]
+        
         @constraints(EP, begin
         # Minimum negative CO2 per DAC "y" at hour "t" > Min stable CO2 capture
             [y in DAC_COMMIT, t=1:T], EP[:vCO2_DAC][y,t] >= dfDac[y,:Min_DAC]*dfDac[y,:Cap_Size]*EP[:vCOMMIT_DAC][y,t]
@@ -159,22 +160,6 @@ function dac!(EP::Model, inputs::Dict, setup::Dict)
 	# DEV NOTE: This constraint may be violated in some cases where Existing_Cap_MW is >= Max_Cap_MW and lead to infeasabilty
     @constraint(EP, cMaxCap_DAC[y in intersect(dfDac[dfDac.Max_Cap_DAC.>0,:R_ID], 1:G_DAC)], vCAP_DAC[y] <= dfDac[y,:Max_Cap_DAC])
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
     # get the CO2 balance 
     # the net negative CO2 for each DAC y at each hour t, CO2 emissions from heat consumption minus CO2 captured by DAC = net negative emissions
     @expression(EP, eCO2_DAC_net[y in DAC_ID, t = 1:T], eDAC_heat_CO2[y,t] - vCO2_DAC[y,t] )
@@ -206,3 +191,4 @@ function dac!(EP::Model, inputs::Dict, setup::Dict)
     
     return EP
 end
+

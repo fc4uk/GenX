@@ -36,7 +36,7 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 		Zone = dfDac[!,:Zone],
 		StartCap = dfDac[!,:Existing_Cap_CO2],
 		NewCap = capdDac[:],
-		EndCap = capdDac[:],
+		EndCap = capdDac[:]
 	)
 	if setup["ParameterScale"] ==1
 		dfCapDac.StartCap = dfCapDac.StartCap * ModelScalingFactor^2
@@ -47,5 +47,30 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 
 	#dfCapDac = vcat(dfCapDac, total)
 	CSV.write(joinpath(path, "capacity_dac.csv"), dfCapDac)
-	return dfCapDac
+
+
+    # write the dual capex cost if fix cost = 0
+	CapexdDac = zeros(size(dfDac[!,:RESOURCES]))
+
+	for i in NEW_CAP
+		CapexdDac[i] = dual.(EP[:cMaxCap_DAC][i])
+	end
+
+	dfCapexDac = DataFrame(
+		Resource = dfDac[!,:RESOURCES],
+		Zone = dfDac[!,:Zone],
+		Capex = -CapexdDac[:]
+	)
+
+	if setup["ParameterScale"] ==1
+		dfCapexDac.Capex = dfCapDac.StartCap * ModelScalingFactor
+	end
+
+
+	if 0 in dfDac.Fix_Cost_per_CO2perHr_yr
+		CSV.write(joinpath(path, "capex_dual_dac.csv"), dfCapexDac)
+	end
+
+
+	
 end

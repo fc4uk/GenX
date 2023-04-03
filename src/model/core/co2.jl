@@ -105,7 +105,7 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
 
     # CO2 zontal constraint
     if setup["NetZero"] == 1
-        @constraint(EP, eEmissionsTotalZoneYear == 0)
+        @constraint(EP, NetZeroGrid, eEmissionsTotalZoneYear == 0)
     end
 
     return EP

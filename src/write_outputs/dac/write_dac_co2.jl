@@ -22,10 +22,11 @@ Function for writing the different values of co2 flow
 function write_dac_co2(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 	dfDac = inputs["dfDac"]
 	DAC_ID = dfDac[!,:DAC_ID]
+	n = length(DAC_ID)
 
 	dfCO2 = DataFrame(Resource = repeat(dfDac[!,:RESOURCES],3), 
 	Zone = repeat(dfDac[!,:Zone],3), 
-	CO2 = ["CO2 heat", "CO2 gross", "CO2 net"]
+	CO2 = repeat(["CO2 heat", "CO2 gross", "CO2 net"], inner=n)
 	)
 
 
