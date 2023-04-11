@@ -52,8 +52,10 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
     # write the dual capex cost if fix cost = 0
 	CapexdDac = zeros(size(dfDac[!,:RESOURCES]))
 
-	for i in NEW_CAP
-		CapexdDac[i] = dual.(EP[:cMaxCap_DAC][i])
+	if !isempty(dual.(EP[:cMaxCap_DAC]))
+		for i in NEW_CAP
+		    CapexdDac[i] = dual.(EP[:cMaxCap_DAC][i])
+	    end
 	end
 
 	dfCapexDac = DataFrame(
@@ -70,6 +72,27 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 	if 0 in dfDac.Fix_Cost_per_CO2perHr_yr
 		CSV.write(joinpath(path, "capex_dual_dac.csv"), dfCapexDac)
 	end
+
+
+	# write dac cost
+
+	dfDac = inputs["dfDac"]
+    # Number of time steps (hours)
+
+	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cCO2_seq", "cCO2_tax"])
+	cVar = (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalVariableDAC]) : 0.0)
+	cFix = (!isempty(inputs["dfDac"]) ? value(EP[:eTotalCFixedDAC]) : 0.0)
+    cCO2_seq =  (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalCO2TS]) : 0.0)
+	cCO2_tax =  ((setup["CO2Tax"]  > 0)  ? value.(EP[:eTotalCCO2TaxDAC]) : 0)
+
+	cDacTotal = 0 
+	cDacTotal += (cVar + cFix + cCO2_seq + cCO2_tax)
+
+	dfCost[!,Symbol("Total")] = [cDacTotal, cFix, cVar, cCO2_seq, cCO2_tax]
+
+	CSV.write(joinpath(path, "Dac_costs.csv"), dfCost)
+
+
 
 
 	

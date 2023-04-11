@@ -22,14 +22,20 @@ Function for writing the costs pertaining to the objective function (fixed, vari
 function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 	## Cost results
 	dfGen = inputs["dfGen"]
+	dfDac = inputs["dfDac"]
 	SEG = inputs["SEG"]  # Number of lines
 	Z = inputs["Z"]     # Number of zones
 	T = inputs["T"]     # Number of time steps (hours)
 
-	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cNSE", "cStart", "cUnmetRsv", "cNetworkExp", "cUnmetPolicyPenalty"])
-	cVar = value(EP[:eTotalCVarOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0.0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0.0)
-	cFix = value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0.0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0.0)
-	dfCost[!,Symbol("Total")] = [objective_value(EP), cFix, cVar, value(EP[:eTotalCNSE]), 0.0, 0.0, 0.0, 0.0]
+	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cNSE", "cStart", "cUnmetRsv", "cNetworkExp", "cUnmetPolicyPenalty", "cCO2_seq", "cCO2_tax"])
+	cVar = value(EP[:eTotalCVarOut])+ value.(EP[:eTotalCFuelOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0.0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0.0)+ (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalVariableDAC]) : 0.0)
+	cFix = value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0.0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0.0)+(!isempty(inputs["dfDac"]) ? value(EP[:eTotalCFixedDAC]) : 0.0)
+    cCO2_seq = value(EP[:eTotaleCCO2Sequestration]) + (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalCO2TS]) : 0.0)
+	cCO2_tax = ((setup["CO2Tax"]  > 0)  ?  (value.(EP[:eTotalCCO2Tax]) ) : 0.0) + 
+	((setup["DAC"] > 0 & setup["CO2Tax"]  > 0)  ?  ( value.(EP[:eTotalCCO2TaxDAC])) : 0.0)
+
+
+	dfCost[!,Symbol("Total")] = [objective_value(EP), cFix, cVar,  value(EP[:eTotalCNSE]), 0.0, 0.0, 0.0, 0.0, cCO2_seq, cCO2_tax]
 
 	if setup["ParameterScale"] == 1
 		dfCost.Total *= ModelScalingFactor^2
@@ -63,6 +69,8 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		dfCost[8,2] += value(EP[:eTotalCMinCapSlack])
 	end	
 
+
+
 	if setup["ParameterScale"] == 1
 		dfCost[5,2] *= ModelScalingFactor^2
 		dfCost[6,2] *= ModelScalingFactor^2
@@ -77,18 +85,36 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		tempCStart = 0.0
 		tempCNSE = 0.0
 
+
 		Y_ZONE = dfGen[dfGen[!,:Zone].==z,:R_ID]
+		Y_ZONE_DAC = dfDac[dfDac[!,:Zone].==z,:R_ID]
+
 		STOR_ALL_ZONE = intersect(inputs["STOR_ALL"], Y_ZONE)
 		STOR_ASYMMETRIC_ZONE = intersect(inputs["STOR_ASYMMETRIC"], Y_ZONE)
 		FLEX_ZONE = intersect(inputs["FLEX"], Y_ZONE)
 		COMMIT_ZONE = intersect(inputs["COMMIT"], Y_ZONE)
 
 		eCFix = sum(value.(EP[:eCFix][Y_ZONE]))
-		tempCFix += eCFix
-		tempCTotal += eCFix
+		eCFix_DAC = ((setup["DAC"]  > 0)  ? sum(value.(EP[:eCFixed_DAC][Y_ZONE_DAC])) : 0)
+		tempCFix += eCFix + eCFix_DAC
+		tempCTotal += tempCFix
 
 		tempCVar = sum(value.(EP[:eCVar_out][Y_ZONE,:]))
-		tempCTotal += tempCVar
+		CVar_DAC = ((setup["DAC"]  > 0)  ? sum(value.(EP[:eCTotalVariableDACT][Y_ZONE_DAC])) : 0 )
+		CVar_fuel = sum(value.(EP[:ePlantCFuelOut][Y_ZONE,:]))
+		tempCVar += CVar_DAC + CVar_fuel
+		tempCTotal += tempCVar 
+
+		tempCO2_seq =  sum(value.(EP[:ePlantCCO2Sequestration][Y_ZONE])) 
+		CCO2seq_DAC = ((setup["DAC"]  > 0)  ? sum(value.(EP[:eCCO2_TS_ByPlant][Y_ZONE_DAC,:])) : 0 )
+		tempCO2_seq += CCO2seq_DAC
+		tempCTotal += tempCO2_seq
+
+		tempCO2_tax = ((setup["CO2Tax"]  > 0)  ? sum(value.(EP[:ePlantCCO2Tax][Y_ZONE])) : 0 )
+		CCO2_DAC = ((setup["CO2Tax"]  & setup["DAC"]  > 0)  ? sum(value.(EP[:ePlantCCO2TaxDAC][Y_ZONE_DAC])) : 0)
+		tempCO2_tax += CCO2_DAC
+		tempCTotal += tempCO2_tax
+
 
 		if !isempty(STOR_ALL_ZONE)
 			eCVar_in = sum(value.(EP[:eCVar_in][STOR_ALL_ZONE,:]))
@@ -125,7 +151,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 			tempCNSE *= ModelScalingFactor^2
 			tempCStart *= ModelScalingFactor^2
 		end
-		dfCost[!,Symbol("Zone$z")] = [tempCTotal, tempCFix, tempCVar, tempCNSE, tempCStart, "-", "-", "-"]
+		dfCost[!,Symbol("Zone$z")] = [tempCTotal, tempCFix, tempCVar, tempCNSE, tempCStart, "-", "-", "-",tempCO2_seq,tempCO2_tax]
 	end
 	CSV.write(joinpath(path, "costs.csv"), dfCost)
 end

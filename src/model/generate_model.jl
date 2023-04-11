@@ -203,11 +203,13 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 
 	# Policies
 	# CO2 emissions limits
+	co2!(EP, inputs, setup) 
+	
 	if setup["CO2Cap"] > 0
 		co2_cap!(EP, inputs, setup)
 	end
 
-	co2!(EP, inputs, setup) 
+
 
 	# CO2 Tax
 	if setup["CO2Tax"] == 1

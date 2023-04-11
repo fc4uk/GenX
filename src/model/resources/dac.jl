@@ -136,7 +136,7 @@ function dac!(EP::Model, inputs::Dict, setup::Dict)
 
         	# Commitment state constraint linking startup and shutdown decisions (Constraint #4)
 	    p = hours_per_subperiod
-            @constraints(EP, begin
+        @constraints(EP, begin
             [y in DAC_ID, t in 1:T], vCOMMIT_DAC[y,t] == vCOMMIT_DAC[y, hoursbefore(p, t, 1)] + vSTART_DAC[y,t] - vSHUT_DAC[y,t]
         end)
 
@@ -183,8 +183,9 @@ function dac!(EP::Model, inputs::Dict, setup::Dict)
     # the sequestrated CO2 from all the DAC during the whole year ($/t CO2)
     @expression(EP, eCCO2_TS_ByZone[z = 1:Z], 
         sum(eCCO2_TS_ByZoneT[z, t] for t in 1:T))
-    # sum of net CO2 across all the zone
-    @expression(EP, eCTotalCO2TS, sum(eCO2_DAC_net_ByZone[z] for z in 1:Z))
+    # sum of CO2 sequestration costs.
+    @expression(EP, eCTotalCO2TS, sum(eCCO2_TS_ByZone[z] for z in 1:Z))
+
 
     EP[:eObj] += eCTotalCO2TS
 
