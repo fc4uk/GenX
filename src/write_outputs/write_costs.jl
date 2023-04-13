@@ -22,17 +22,17 @@ Function for writing the costs pertaining to the objective function (fixed, vari
 function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 	## Cost results
 	dfGen = inputs["dfGen"]
-	dfDac = inputs["dfDac"]
+	dfDac =  (setup["DAC"] > 0 ? inputs["dfDac"] : 0.0)
 	SEG = inputs["SEG"]  # Number of lines
 	Z = inputs["Z"]     # Number of zones
 	T = inputs["T"]     # Number of time steps (hours)
 
 	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cNSE", "cStart", "cUnmetRsv", "cNetworkExp", "cUnmetPolicyPenalty", "cCO2_seq", "cCO2_tax"])
-	cVar = value(EP[:eTotalCVarOut])+ value.(EP[:eTotalCFuelOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0.0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0.0)+ (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalVariableDAC]) : 0.0)
-	cFix = value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0.0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0.0)+(!isempty(inputs["dfDac"]) ? value(EP[:eTotalCFixedDAC]) : 0.0)
-    cCO2_seq = value(EP[:eTotaleCCO2Sequestration]) + (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalCO2TS]) : 0.0)
-	cCO2_tax = ((setup["CO2Tax"]  > 0)  ?  (value.(EP[:eTotalCCO2Tax]) ) : 0.0) + 
-	((setup["DAC"] > 0 & setup["CO2Tax"]  > 0)  ?  ( value.(EP[:eTotalCCO2TaxDAC])) : 0.0)
+	cVar = value(EP[:eTotalCVarOut])+ value.(EP[:eTotalCFuelOut])+ (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0.0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0.0)+ (dfDac != 0 ? value(EP[:eCTotalVariableDAC]) : 0.0)
+	cFix = value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0.0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0.0)+(dfDac != 0 ? value(EP[:eTotalCFixedDAC]) : 0.0)
+    
+	cCO2_seq = (setup["CO2Capture"] >0) ? (value(EP[:eTotaleCCO2Sequestration]) + (dfDac != 0 ? value(EP[:eCTotalCO2TS]) : 0.0)) : 0
+	cCO2_tax = ((setup["CO2Tax"]  > 0)  ?  (value.(EP[:eTotalCCO2Tax]) ) : 0.0) + ((setup["DAC"] > 0 & setup["CO2Tax"]  > 0)  ?  ( value.(EP[:eTotalCCO2TaxDAC])) : 0.0)
 
 
 	dfCost[!,Symbol("Total")] = [objective_value(EP), cFix, cVar,  value(EP[:eTotalCNSE]), 0.0, 0.0, 0.0, 0.0, cCO2_seq, cCO2_tax]
@@ -87,7 +87,10 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 
 
 		Y_ZONE = dfGen[dfGen[!,:Zone].==z,:R_ID]
-		Y_ZONE_DAC = dfDac[dfDac[!,:Zone].==z,:R_ID]
+
+		if dfDac != 0
+			Y_ZONE_DAC = dfDac[dfDac[!,:Zone].==z,:R_ID]
+		end
 
 		STOR_ALL_ZONE = intersect(inputs["STOR_ALL"], Y_ZONE)
 		STOR_ASYMMETRIC_ZONE = intersect(inputs["STOR_ASYMMETRIC"], Y_ZONE)
@@ -105,7 +108,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		tempCVar += CVar_DAC + CVar_fuel
 		tempCTotal += tempCVar 
 
-		tempCO2_seq =  sum(value.(EP[:ePlantCCO2Sequestration][Y_ZONE])) 
+		tempCO2_seq =  (setup["CO2Capture"]  > 0)  ? sum(value.(EP[:ePlantCCO2Sequestration][Y_ZONE])) : 0
 		CCO2seq_DAC = ((setup["DAC"]  > 0)  ? sum(value.(EP[:eCCO2_TS_ByPlant][Y_ZONE_DAC,:])) : 0 )
 		tempCO2_seq += CCO2seq_DAC
 		tempCTotal += tempCO2_seq

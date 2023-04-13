@@ -76,7 +76,10 @@ function configure_settings(settings_path::String)
     set_default_if_absent!(settings, "FLECCS", 0)
     # Piecewise fuel consumption
     set_default_if_absent!(settings, "PieceWiseHeatRate", 0)
-
+    # DAC; 0 = not active, 1 = active
+    set_default_if_absent!(settings, "DAC", 0)
+    # NET ZERO; 0 = not active, 1 = active
+    set_default_if_absent!(settings, "NetZero", 0)
 
 
 return settings
