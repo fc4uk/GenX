@@ -25,14 +25,14 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 	#MultiStage = setup["MultiStage"]
 	NEW_CAP = dfDac[dfDac[!,:NEW_CAP] .==1,:R_ID]
 	DAC_COMMIT = dfDac[dfDac[!,:DAC_COMMIT] .==1,:R_ID]
-	capdDac = zeros(size(dfDac[!,:RESOURCES]))
+	capdDac = zeros(size(dfDac[!,:Resource]))
 	for i in  NEW_CAP
 		capdDac[i] = value(EP[:vCAP_DAC][i])
 	end
 
 
 	dfCapDac = DataFrame(
-		Resource = dfDac[!,:RESOURCES],
+		Resource = dfDac[!,:Resource],
 		Zone = dfDac[!,:Zone],
 		StartCap = dfDac[!,:Existing_Cap_CO2],
 		NewCap = capdDac[:],
@@ -50,7 +50,7 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 
 
     # write the dual capex cost if fix cost = 0
-	CapexdDac = zeros(size(dfDac[!,:RESOURCES]))
+	CapexdDac = zeros(size(dfDac[!,:Resource]))
 
 	if !isempty(dual.(EP[:cMaxCap_DAC]))
 		for i in NEW_CAP
@@ -59,7 +59,7 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 	end
 
 	dfCapexDac = DataFrame(
-		Resource = dfDac[!,:RESOURCES],
+		Resource = dfDac[!,:Resource],
 		Zone = dfDac[!,:Zone],
 		Capex = -CapexdDac[:]
 	)
