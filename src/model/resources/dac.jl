@@ -176,7 +176,7 @@ function dac!(EP::Model, inputs::Dict, setup::Dict)
     # separately account for the amount of CO2 that is captured.
     # actually the eCO2_net should be the total sequestration carbon. since eCO2_DAC_net should be a negative value, put minus sign in front of it..
     # costs associated with co2 transport & storage ($/(t CO2/h)) = captured co2 (t CO2/h) * Co2 transport and storage cost ($/t CO2)
-    @expression(EP, eCCO2_TS_ByPlant[y in DAC_ID, t = 1:T], -eCO2_DAC_net[y, t]* dfDac[y, :CO2_Transport_Storage_Per_t]* omega[t])
+    @expression(EP, eCCO2_TS_ByPlant[y in DAC_ID, t = 1:T], vCO2_DAC[y, t]* dfDac[y, :CO2_Transport_Storage_Per_t]* omega[t])
     # the sequestrated CO2 from all the DAC 
     @expression(EP, eCCO2_TS_ByZoneT[z = 1:Z, t = 1:T], 
         sum(eCCO2_TS_ByPlant[y, t] for y in dfDac[(dfDac[!, :Zone].==z), :DAC_ID]))
