@@ -339,7 +339,8 @@ function morris(EP::Model, path::AbstractString, setup::Dict, inputs::Dict, outp
     Morris_range = load_dataframe(joinpath(path, "Method_of_morris_range.csv"))
     dataframe_for_file = Dict("Generators_data"=>"dfGen",
                               "Fleccs_data"=>"dfGen_ccs",
-                              "Thermal_storage"=>"dfTS")
+                              "Thermal_storage"=>"dfTS",
+                              "dac"=>"dfDac")
     impute_morris_instructions!(Morris_range, dataframe_for_file, inputs)
     groups = Morris_range[!,:Group]
     p_steps = Morris_range[!,:p_steps]
