@@ -117,6 +117,14 @@ function write_outputs(EP::Model, path::AbstractString, setup::Dict, inputs::Dic
 		println(elapsed_time_lds_dstor)
 	end
 
+
+	##write DAC
+	if setup["DAC"] == 1
+		write_dac_capacity(path, inputs, setup, EP)
+		write_dac_co2(path, inputs, setup, EP)
+	end
+
+
 	# Temporary! Suppress these outputs until we know that they are compatable with multi-stage modeling
 	if setup["MultiStage"] == 0
 		dfPrice = DataFrame()

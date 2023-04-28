@@ -114,6 +114,10 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		@expression(EP, eMaxCapRes[maxcap = 1:inputs["NumberOfMaxCapReqs"]], 0)
 	end
 
+	if setup["MaxCapReq"] == 1
+		@expression(EP, eMaxCapRes[maxcap = 1:inputs["NumberOfMaxCapReqs"]], 0)
+	end
+
 	# Infrastructure
 	discharge!(EP, inputs, setup)
 
@@ -125,7 +129,9 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		ucommit!(EP, inputs, setup)
 	end
 
-	emissions!(EP, inputs)
+	fuel!(EP, inputs, setup)
+
+	#emissions!(EP, inputs)
 
 	if setup["Reserves"] > 0
 		reserves!(EP, inputs, setup)
@@ -176,10 +182,26 @@ function generate_model(setup::Dict,inputs::Dict,OPTIMIZER::MOI.OptimizerWithAtt
 		EP = retrofit(EP, inputs)
 	end
 
+	#DAC
+	if (setup["DAC"] == 1)
+		dac!(EP, inputs, setup)
+	end
+	
+
+
 	# Policies
 	# CO2 emissions limits
+	co2!(EP, inputs, setup) 
+	
 	if setup["CO2Cap"] > 0
 		co2_cap!(EP, inputs, setup)
+	end
+
+
+
+	# CO2 Tax
+	if setup["CO2Tax"] == 1
+		co2_tax!(EP, inputs, setup)
 	end
 
 	# Endogenous Retirements

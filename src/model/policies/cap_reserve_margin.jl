@@ -16,6 +16,7 @@ function cap_reserve_margin!(EP::Model, inputs::Dict, setup::Dict)
 	# capacity reserve margin constraint
 	T = inputs["T"]
 	NCRM = inputs["NCapacityReserveMargin"]
+	NCRM = inputs["NCapacityReserveMargin"]
 	println("Capacity Reserve Margin Policies Module")
 
 	@constraint(EP, cCapacityResMargin[res=1:NCRM, t=1:T], EP[:eCapResMarBalance][res, t]

@@ -18,6 +18,7 @@ function load_inputs(setup::Dict,path::AbstractString)
 	# Read input data about power network topology, operating and expansion attributes
 	if isfile(joinpath(path,"Network.csv"))
 		network_var = load_network_data!(setup, path, inputs)
+		network_var = load_network_data!(setup, path, inputs)
 	else
 		inputs["Z"] = 1
 		inputs["L"] = 0
@@ -25,9 +26,12 @@ function load_inputs(setup::Dict,path::AbstractString)
 
 	# Read temporal-resolved load data, and clustering information if relevant
 	load_load_data!(setup, path, inputs)
+	load_load_data!(setup, path, inputs)
 	# Read fuel cost data, including time-varying fuel costs
 	cost_fuel, CO2_fuel = load_fuels_data!(setup, path, inputs)
+	cost_fuel, CO2_fuel = load_fuels_data!(setup, path, inputs)
 	# Read in generator/resource related inputs
+	load_generators_data!(setup, path, inputs, cost_fuel, CO2_fuel)
 	load_generators_data!(setup, path, inputs, cost_fuel, CO2_fuel)
 	# Read in generator/resource availability profiles
 	load_generators_variability!(setup, path, inputs)
@@ -62,8 +66,18 @@ function load_inputs(setup::Dict,path::AbstractString)
 		load_co2_cap!(setup, path, inputs)
 	end
 
+	if setup["CO2Tax"] >= 1
+		load_co2_tax!(setup, path, inputs)
+	end
+
+	if setup["DAC"] == 1
+		load_dac_data!(setup, path, inputs)
+	end
+
+
 	# Read in mapping of modeled periods to representative periods
 	if is_period_map_necessary(setup, path, inputs) && is_period_map_exist(setup, path, inputs)
+		load_period_map!(setup, path, inputs)
 		load_period_map!(setup, path, inputs)
 	end
 
