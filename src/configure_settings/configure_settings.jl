@@ -81,6 +81,7 @@ function configure_settings(settings_path::String)
     # NET ZERO; 0 = not active, 1 = active
     set_default_if_absent!(settings, "NetZero", 0)
 
+    set_default_if_absent!(settings, "CarbonBudget", 0)
 
 return settings
 end

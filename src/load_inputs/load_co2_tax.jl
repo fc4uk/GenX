@@ -20,10 +20,10 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 Function for reading input parameters related to tax on CO$_2$ emissions
 """
 function load_co2_tax!(setup::Dict, path::AbstractString, inputs_co2_tax::Dict)
-	#scale_factor = setup["ParameterScale"] == 1 ? ModelScalingFactor : 1
+	scale_factor = setup["ParameterScale"] == 1 ? ModelScalingFactor : 1
 	# Definition of CO2 Tax requirements by zone (as Max Mtons)
 	inputs_co2_tax["dfCO2Tax"] = DataFrame(CSV.File(joinpath(path, "CO2_tax.csv"), header=true), copycols=true)
-	inputs_co2_tax["dfCO2Tax"][!,:CO2Tax] = convert(Array{Float64}, inputs_co2_tax["dfCO2Tax"][!,:CO2Tax])
+	inputs_co2_tax["dfCO2Tax"][!,:CO2Tax] = convert(Array{Float64}, inputs_co2_tax["dfCO2Tax"][!,:CO2Tax])/scale_factor
 
 	# scale parameters if ModelScalingFactor is applied 
 	# don't need to scale co2 tax ($/t) as the co2 is alrady scaled in $/billion BTU
