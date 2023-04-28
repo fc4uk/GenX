@@ -23,6 +23,10 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
     G = inputs["G"]     # Number of resources (generators, storage, DR, and DERs)
     T = inputs["T"]     # Number of time steps (hours)
     Z = inputs["Z"]     # Number of zones
+    
+    scale_factor = setup["ParameterScale"] == 1 ? ModelScalingFactor : 1
+
+    dfGen.BECCS = "BECCS" in names(dfGen) ? dfGen.BECCS : zeros(Int, nrow(dfGen))
 
     ### Expressions ###
     # CO2 emissions from power plants in "Generator_data.csv"
@@ -32,7 +36,7 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
                 inputs["fuel_CO2"][dfGen[y,:Fuel]]))
     else # setup["CO2Capture"] == 1
         @expression(EP, eEmissionsByPlant[y=1:G, t=1:T],
-            (1 - dfGen[!, :CO2_Capture_Rate][y]) * 
+            ((1-dfGen.BECCS[y]) - dfGen[!, :CO2_Capture_Rate][y]) * 
             ((EP[:vFuel][y, t] + EP[:eStartFuel][y, t]) * 
                 inputs["fuel_CO2"][dfGen[y,:Fuel]]))
         # CO2  captured from power plants in "Generator_data.csv"
@@ -53,9 +57,10 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
     
     
         # add CO2 sequestration cost to objective function
+        # when scale factor is on tCO2/MWh = > kt CO2/GWh
         @expression(EP, ePlantCCO2Sequestration[y=1:G], 
             sum(inputs["omega"][t] * eEmissionsCaptureByPlant[y, t] * 
-                dfGen[y, :CO2_Capture_Cost_per_Metric_Ton] for t in 1:T))
+                dfGen[y, :CO2_Capture_Cost_per_Metric_Ton] /scale_factor for t in 1:T))
     
         @expression(EP, eZonalCCO2Sequestration[z=1:Z], 
             sum(ePlantCCO2Sequestration[y] 
@@ -90,6 +95,9 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
         eEmissionsByZoneAll += eEmissionsByZoneFleccs
     end
 
+
+    ## when modeling scale factor is on, electricity from MW => GW, EmissionsByPlant = GW * (kt/GW) = kt CO2
+    
     if setup["DAC"] == 1
         dfDac = inputs["dfDac"]
 	    @expression(EP, eEmissionsByZoneDAC[z=1:Z, t=1:T], 
@@ -106,6 +114,10 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
     # CO2 zontal constraint
     if setup["NetZero"] == 1
         @constraint(EP, NetZeroGrid, eEmissionsTotalZoneYear == 0)
+    end
+
+    if setup["CarbonBudget"] != 0
+        @constraint(EP, CarbonBudget, eEmissionsTotalZoneYear <= setup["CarbonBudget"])
     end
 
     return EP

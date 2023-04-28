@@ -46,7 +46,7 @@ function load_dac_data!(setup::Dict, path::AbstractString, inputs::Dict)
 
 
     # the capacity of DAC is expressed as t CO2/h 
-    # the unit of fixed cost is $/t CO2/have
+    # the unit of fixed cost is $/t CO2
     # the unit of non-fuel VOM is $/t CO2
     # the unit of heat consumption is MMBTU/t CO2
     # the unit of electricity consumption is MWh/t CO2
@@ -55,16 +55,18 @@ function load_dac_data!(setup::Dict, path::AbstractString, inputs::Dict)
         # keep the unit of CO2 to be t through out of the calculations...
         # convert the cost from $/t CO2/h to million $/t CO2/h
         # I dont think we have exiting capacity for DAC..so I will just do the conversion for Fixed Cost, VOM, heat, electricity consumption
-        #inputs["dfDac"][!, :Fix_Cost_per_CO2perHr_yr] = dac_in[!, :Fix_Cost_per_CO2perHr_yr]/ModelScalingFactor
+        inputs["dfDac"][!, :Fix_Cost_per_CO2perHr_yr] = dac_in[!, :Fix_Cost_per_CO2perHr_yr]/ModelScalingFactor
 
-        #inputs["dfDac"][!, :Var_OM_Cost_per_CO2] = dac_in[!, :Var_OM_Cost_per_CO2]/ModelScalingFactor
+        inputs["dfDac"][!, :Var_OM_Cost_per_CO2] = dac_in[!, :Var_OM_Cost_per_CO2]/ModelScalingFactor
 
-        #MMBTU/t CO2/h =>Billion BTu/t CO2/h
-        inputs["dfDac"][!, :Heat_MMBTU_per_CO2_metric_ton] = dac_in[!, :Heat_MMBTU_per_CO2_metric_ton]*ModelScalingFactor
-        #MWh/t CO2/h =>GWh/t CO2/h
-        inputs["dfDac"][!, :Electricity_MWh_per_CO2_metric_ton] = dac_in[!, :Electricity_MWh_per_CO2_metric_ton]*ModelScalingFactor
-    
-        #inputs["dfDac"][!, :Max_Cap_DAC] = dac_in[!, :Max_Cap_DAC]/ModelScalingFactor
+        #MMBTU/t CO2/h =>Billion BTu/kt CO2/h
+        #inputs["dfDac"][!, :Heat_MMBTU_per_CO2_metric_ton] = dac_in[!, :Heat_MMBTU_per_CO2_metric_ton]*ModelScalingFactor
+        #MWh/t CO2/h =>GWh/kt CO2/h
+        #inputs["dfDac"][!, :Electricity_MWh_per_CO2_metric_ton] = dac_in[!, :Electricity_MWh_per_CO2_metric_ton]*ModelScalingFactor
+
+        inputs["dfDac"][!, :CO2_Transport_Storage_Per_t] = dac_in[!, :CO2_Transport_Storage_Per_t]/ModelScalingFactor
+
+        inputs["dfDac"][!, :Max_Cap_DAC] = dac_in[!, :Max_Cap_DAC]/ModelScalingFactor
     end
 
     println(filename * " Successfully Read!")
