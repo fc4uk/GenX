@@ -23,6 +23,18 @@ function default_settings()
         "MethodofMorris" => 0,
         "IncludeLossesInESR" => 0,
         "EnableJuMPStringNames" => false,
+
+        "CO2Tax" => 0,
+        "CO2Capture" => 0,
+        "FLECCS" => 0,
+        "PieceWiseHeatRate" => 0,
+        "DAC" => 0,
+        "NetZero" => 0,
+        "CarbonBudget" => 0
+
+
+        
+
     )
 end
 
