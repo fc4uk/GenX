@@ -20,6 +20,8 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 Function for writing the different values of co2 flow
 """
 function write_dac_co2(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
+
+
 	dfDac = inputs["dfDac"]
 	DAC_ID = dfDac[!,:DAC_ID]
 	n = length(DAC_ID)
@@ -35,9 +37,9 @@ function write_dac_co2(path::AbstractString, inputs::Dict, setup::Dict, EP::Mode
 	CO2_net = value.(EP[:eCO2_DAC_net])
 
 	if setup["ParameterScale"] == 1
-		CO2_heat *= ModelScalingFactor^2
-		CO2_gross *= ModelScalingFactor^2
-		CO2_net *= ModelScalingFactor^2
+		CO2_heat *= ModelScalingFactor
+		CO2_gross *= ModelScalingFactor
+		CO2_net *= ModelScalingFactor
 	end
 
 	CO2 = DataFrame(vcat(CO2_heat,CO2_gross, CO2_net),:auto)

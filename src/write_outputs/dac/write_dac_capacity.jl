@@ -20,6 +20,8 @@ received this license file.  If not, see <http://www.gnu.org/licenses/>.
 Function for writing the diferent capacities for the different generation technologies (starting capacities or, existing capacities, retired capacities, and new-built capacities).
 """
 function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
+    # scale factor
+	scale_factor = setup["ParameterScale"] == 1 ? ModelScalingFactor : 1
 	# Capacity decisions
 	dfDac = inputs["dfDac"]
 	#MultiStage = setup["MultiStage"]
@@ -38,12 +40,10 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 		NewCap = capdDac[:],
 		EndCap = capdDac[:]
 	)
-	if setup["ParameterScale"] ==1
-		dfCapDac.StartCap = dfCapDac.StartCap * ModelScalingFactor^2
-		dfCapDac.NewCap = dfCapDac.NewCap * ModelScalingFactor^2
-		dfCapDac.EndCap = dfCapDac.EndCap * ModelScalingFactor^2
-	end
 
+	dfCapDac.StartCap = dfCapDac.StartCap * scale_factor
+	dfCapDac.NewCap = dfCapDac.NewCap * scale_factor
+	dfCapDac.EndCap = dfCapDac.EndCap * scale_factor
 
 	#dfCapDac = vcat(dfCapDac, total)
 	CSV.write(joinpath(path, "capacity_dac.csv"), dfCapDac)
@@ -64,9 +64,9 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 		Capex = -CapexdDac[:]
 	)
 
-	if setup["ParameterScale"] ==1
-		dfCapexDac.Capex = dfCapDac.StartCap * ModelScalingFactor
-	end
+
+	dfCapexDac.Capex = dfCapDac.StartCap * scale_factor
+
 
 
 	if 0 in dfDac.Fix_Cost_per_CO2perHr_yr
@@ -80,10 +80,10 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
     # Number of time steps (hours)
 
 	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cCO2_seq", "cCO2_tax"])
-	cVar = (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalVariableDAC]) : 0.0)
-	cFix = (!isempty(inputs["dfDac"]) ? value(EP[:eTotalCFixedDAC]) : 0.0)
-    cCO2_seq =  (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalCO2TS]) : 0.0)
-	cCO2_tax =  ((setup["CO2Tax"]  > 0)  ? value.(EP[:eTotalCCO2TaxDAC]) : 0)
+	cVar = (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalVariableDAC])*scale_factor^2 : 0.0)
+	cFix = (!isempty(inputs["dfDac"]) ? value(EP[:eTotalCFixedDAC])*scale_factor^2 : 0.0)
+    cCO2_seq =  (!isempty(inputs["dfDac"]) ? value(EP[:eCTotalCO2TS])*scale_factor^2 : 0.0)
+	cCO2_tax =  ((setup["CO2Tax"]  > 0)  ? value.(EP[:eTotalCCO2TaxDAC])*scale_factor^2 : 0)
 
 	cDacTotal = 0 
 	cDacTotal += (cVar + cFix + cCO2_seq + cCO2_tax)
