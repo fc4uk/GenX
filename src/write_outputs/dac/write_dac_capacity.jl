@@ -54,7 +54,7 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 
 	if !isempty(dual.(EP[:cMaxCap_DAC]))
 		for i in NEW_CAP
-		    CapexdDac[i] = dual.(EP[:cMaxCap_DAC][i])
+		    CapexdDac[i] = dual.(EP[:cMaxCap_DAC][i])*scale_factor
 	    end
 	end
 
@@ -64,8 +64,6 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 		Capex = -CapexdDac[:]
 	)
 
-
-	dfCapexDac.Capex = dfCapDac.Capex * scale_factor
 
 
 
