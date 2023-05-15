@@ -65,7 +65,7 @@ function write_dac_capacity(path::AbstractString, inputs::Dict, setup::Dict, EP:
 	)
 
 
-	dfCapexDac.Capex = dfCapDac.StartCap * scale_factor
+	dfCapexDac.Capex = dfCapDac.Capex * scale_factor
 
 
 
