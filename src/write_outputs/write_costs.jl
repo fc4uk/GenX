@@ -153,6 +153,9 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 			tempCVar *= ModelScalingFactor^2
 			tempCNSE *= ModelScalingFactor^2
 			tempCStart *= ModelScalingFactor^2
+			tempCO2_seq *= ModelScalingFactor^2
+			tempCO2_tax *= ModelScalingFactor^2
+
 		end
 		dfCost[!,Symbol("Zone$z")] = [tempCTotal, tempCFix, tempCVar, tempCNSE, tempCStart, "-", "-", "-",tempCO2_seq,tempCO2_tax]
 	end
