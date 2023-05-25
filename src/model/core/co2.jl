@@ -106,7 +106,7 @@ function co2!(EP::Model, inputs::Dict, setup::Dict)
     end
 
     @expression(EP, eEmissionsByZoneYear[z = 1:Z], 
-        sum(eEmissionsByZoneAll[z, t] for t in 1:T))
+        sum(inputs["omega"][t]*eEmissionsByZoneAll[z, t] for t in 1:T))
 
     @expression(EP, eEmissionsTotalZoneYear, 
         sum(eEmissionsByZoneYear[z] for z in 1:Z))

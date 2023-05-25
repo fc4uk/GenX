@@ -26,15 +26,20 @@ function write_dac_co2(path::AbstractString, inputs::Dict, setup::Dict, EP::Mode
 	DAC_ID = dfDac[!,:DAC_ID]
 	n = length(DAC_ID)
 
-	dfCO2 = DataFrame(Resource = repeat(dfDac[!,:Resource],3), 
-	Zone = repeat(dfDac[!,:Zone],3), 
-	CO2 = repeat(["CO2 heat", "CO2 gross", "CO2 net"], inner=n)
-	)
+	dfCO2 = DataFrame(Resource = repeat(dfDac[!,:Resource],3),
+    Zone = repeat(dfDac[!,:Zone],3),
+    CO2 = repeat(["CO2 heat", "CO2 gross", "CO2 net"], inner=n),
+    CO2_sum = repeat([0,0,0],inner=n)
+    )
+
+    dfCO2.CO2_sum = append!(Matrix(value.(EP[:eDAC_heat_CO2]))*inputs["omega"],
+    -Matrix(value.(EP[:vCO2_DAC]))*inputs["omega"],
+    Matrix(value.(EP[:eCO2_DAC_net]))*inputs["omega"])
 
 
-	CO2_heat = value.(EP[:eDAC_heat_CO2])
-	CO2_gross = -value.(EP[:vCO2_DAC])
-	CO2_net = value.(EP[:eCO2_DAC_net])
+	CO2_heat = Matrix(value.(EP[:eDAC_heat_CO2]))
+	CO2_gross = -Matrix(value.(EP[:vCO2_DAC]))
+	CO2_net = Matrix(value.(EP[:eCO2_DAC_net]))
 
 	if setup["ParameterScale"] == 1
 		CO2_heat *= ModelScalingFactor
