@@ -10,11 +10,11 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 	Z = inputs["Z"]     # Number of zones
 	T = inputs["T"]     # Number of time steps (hours)
 
-	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cFuel" ,"cNSE", "cStart", "cStartFuel", "cUnmetRsv", "cNetworkExp", "cUnmetPolicyPenalty"])
+	dfCost = DataFrame(Costs = ["cTotal", "cFix", "cVar", "cFuel" ,"cNSE", "cStart", "cStartFuel", "cUnmetRsv", "cNetworkExp", "cUnmetPolicyPenalty", "cCO2"])
 	cVar =  value(EP[:eTotalCVarOut]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCVarIn]) : 0.0) + (!isempty(inputs["FLEX"]) ? value(EP[:eTotalCVarFlexIn]) : 0.0)
 	cFuel = value.(EP[:eTotalCFuelOut])
 	cFix = value(EP[:eTotalCFix]) + (!isempty(inputs["STOR_ALL"]) ? value(EP[:eTotalCFixEnergy]) : 0.0) + (!isempty(inputs["STOR_ASYMMETRIC"]) ? value(EP[:eTotalCFixCharge]) : 0.0)
-	dfCost[!,Symbol("Total")] = [value(EP[:eObj]), cFix, cVar, cFuel,value(EP[:eTotalCNSE]), 0.0, 0.0, 0.0, 0.0, 0.0] 
+	dfCost[!,Symbol("Total")] = [value(EP[:eObj]), cFix, cVar, cFuel,value(EP[:eTotalCNSE]), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] 
 
 	if setup["ParameterScale"] == 1
 		dfCost.Total *= ModelScalingFactor^2
@@ -49,6 +49,10 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		dfCost[10,2] += value(EP[:eTotalCMinCapSlack])
 	end	
 
+	if any(x -> x != 0, dfGen.CO2_Capture_Rate)
+		dfCost[11,2] += value(EP[:eTotaleCCO2Sequestration])
+	end
+
 	if setup["ParameterScale"] == 1
 		dfCost[5,2] *= ModelScalingFactor^2
 		dfCost[6,2] *= ModelScalingFactor^2
@@ -56,6 +60,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		dfCost[8,2] *= ModelScalingFactor^2
 		dfCost[9,2] *= ModelScalingFactor^2
 		dfCost[10,2] *= ModelScalingFactor^2
+		dfCost[11,2] *= ModelScalingFactor^2
 	end
 
 	for z in 1:Z
@@ -66,6 +71,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		tempCStart = 0.0
 		tempCStartFuel = 0.0
 		tempCNSE = 0.0
+		tempCCO2 = 0.0
 
 		Y_ZONE = dfGen[dfGen[!,:Zone].==z,:R_ID]
 		STOR_ALL_ZONE = intersect(inputs["STOR_ALL"], Y_ZONE)
@@ -114,6 +120,11 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 		tempCNSE = sum(value.(EP[:eCNSE][:,:,z]))
 		tempCTotal += tempCNSE
 
+		if any(x -> x != 0, dfGen.CO2_Capture_Rate)
+			tempCCO2 = sum(value.(EP[:ePlantCCO2Sequestration][Y_ZONE,:]))
+			tempCTotal += tempCCO2		
+		end
+
 		if setup["ParameterScale"] == 1
 			tempCTotal *= ModelScalingFactor^2
 			tempCFix *= ModelScalingFactor^2
@@ -123,7 +134,7 @@ function write_costs(path::AbstractString, inputs::Dict, setup::Dict, EP::Model)
 			tempCStart *= ModelScalingFactor^2
 			tempCStartFuel *= ModelScalingFactor^2
 		end
-		dfCost[!,Symbol("Zone$z")] = [tempCTotal, tempCFix, tempCVar, tempCFuel,tempCNSE, tempCStart,tempCStartFuel, "-", "-", "-"]
+		dfCost[!,Symbol("Zone$z")] = [tempCTotal, tempCFix, tempCVar, tempCFuel,tempCNSE, tempCStart,tempCStartFuel, "-", "-", "-", tempCCO2]
 	end
 	CSV.write(joinpath(path, "costs.csv"), dfCost)
 end
